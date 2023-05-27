@@ -1,0 +1,33 @@
+{
+  "configurations": [
+      {
+          "type": "dezog",
+          "request": "launch",
+          "name": "DeZog",
+          "remoteType": "cspect",
+          "sjasmplus": [
+            {
+                "path": "${workspaceRoot}/project/src/myapp.sld.txt",
+            }
+          ],
+          "startAutomatically": false,
+          "history": {
+              "reverseDebugInstructionCount": 10000,
+              "codeCoverageEnabled": true
+          },
+          "commandsAfterLaunch": [
+              //"-sprites",
+              //"-patterns"
+          ],
+          "disassemblerArgs": {
+              "esxdosRst": true
+          },
+          "rootFolder": "${workspaceFolder}",
+          "topOfStack": "256",
+          "load": "myapp.sna",
+          "startAutomatically": false,
+          "smallValuesMaximum": 513,
+          "tmpDir": ".tmp"
+      }
+  ]
+}

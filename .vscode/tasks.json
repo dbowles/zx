@@ -1,0 +1,48 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Compile Assembly",
+      "command": "${workspaceRoot}/project/bin/sjasmplus ${workspaceRoot}/project/src/myapp.asm --zxnext=cspect --msg=all --fullpath --lst --sld",
+      "type": "shell",
+      "args": [],
+      "problemMatcher": {
+        "fileLocation": "autoDetect",
+        "pattern": {
+          "regexp": "^(.*)\\(([0-9]+)\\): (error|warning):\\s+(.*)$",
+          "file": 1,
+          "line": 2,
+          "severity": 3,
+          "message": 4
+        }
+      },
+      "presentation": {
+        "reveal": "always"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    },
+    {
+      "label": "Update SD Card",
+      "command": "${workspaceRoot}/project/bin/hdfmonkey put ${workspaceRoot}/sdcard/cspect-next-16gb.img myapp.sna",
+      "type": "shell",
+      "presentation": {
+        "reveal": "always"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Launch CSpect",
+      "type": "shell",
+      "command": "mono ${workspaceRoot}/project/bin/CSpect.exe -w4 -r -s14 -tv -esc -brk -basickeys -zxnext -nextrom -map=${workspaceRoot}/project.map -mmc=${workspaceRoot}/sdcard/cspect-next-16gb.img myapp.sna",
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "Compile Assembly",
+        "Update SDCard"
+      ],
+      "problemMatcher": []
+    }
+  ]
+}
