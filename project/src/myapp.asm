@@ -1,3 +1,12 @@
+; *********************************************************************************************************************
+; Author:  Darren Bowles
+; Date:    2020-05-03
+; Purpose: This is just a test to help me learn coding Z80 on a ZX Spectrum
+; shout out to Jonathan Cauldwell for their excellent tutorials and Allan Turvey of Happy Coding ZX for 
+; inspiration from his live streaming warts n all coding session on Lunar Rescue conversion
+; *********************************************************************************************************************
+
+
   device zxspectrum48
   
 IM2_TABLE   = $FE00 ; IM2 interrupt vector table in decimal is 65024
@@ -359,11 +368,6 @@ im2_handler:
   push ix
   push iy
 
-  ; Update screen attributes here
-  ; ld hl, attrBuffer ; Load address of attribute buffer into HL register pair
-  ; ld de, $5800 ; Load address of screen attributes into DE register pair
-  ; ld bc, 768 ; Load number of bytes to copy into BC register pair
-  ; ldir ; Copy bytes from attribute buffer to screen attributes
 
 
   ;rst 56 ; read the keys and update clock

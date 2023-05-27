@@ -1,4 +1,3 @@
-; add a copyright header with my name, description etc
 ; *********************************************************************************************************************
 ; Author:  Darren Bowles
 ; Date:    2020-05-03
@@ -85,41 +84,49 @@ AttributeBufferLookup:
 ;   HL: Attribute Buffer address
 ;
 CalculateAttributeBufferAddress:
-  ; get the address of the lookup table
-  ld hl,AttributeBufferLookup 
+  ; Load the address of the lookup table into HL
+  ld hl, AttributeBufferLookup 
 
-  ; double the Y coordinate
-  ld a,c
-  add a,a
-  add a,l
-  ld l,a
+  ; Double the Y coordinate by adding it to itself
+  ld a, c
+  add a, a
+  add a, l
+  ld l, a
 
-  ; get the table address for the Y coordinate
-  ld de,(hl)
+  ; Get the table address for the Y coordinate
+  ld de, (hl)
 
   ; Add the X coordinate (in register B) to the table address (in register E)
-  ld a,b
-  add a,e
-  ld e,a
+  ld a, b
+  add a, e
+  ld e, a
 
-  ; did we get a carry?  i.e. we exceeded 255?
+  ; Check if we got a carry (i.e. we exceeded 255)
   jr nc, .noCarry
+
+  ; If we got a carry, increment the high byte of the address
   inc d
   
 .noCarry:
-  ; move the combined address into HL
-  ld hl,de
+  ; Move the combined address into HL
+  ld hl, de
 
+  ; Return from the subroutine
   ret
 
 
 ; Copy the attributes buffer to the screen attributes
-; TODO: this is super crude, it just copies the lot over.  We can be more efficient
+; TODO: This is a crude implementation that copies the entire buffer. 
+; A more efficient implementation is possible.
 copyScreenAttributes:
-  ; TODO: i've disabled the interrupts here, as I don't want stack pointer to move around, not sure if this is necessary
-  di                            ; disable interrupts
-  ld (CopyOfStackPointer), sp   ; save the current stack pointer to memory
-  BufferCopyMacro 24            ; call the "BufferCopyMacro" macro with a count 24 rows
-  ld sp, (CopyOfStackPointer)   ; restore the stack pointer from memory
-  ei                            ; enable interrupts
-  ret                          
+  ; Save the current stack pointer to memory
+  ld (CopyOfStackPointer), sp
+
+  ; Call the "BufferCopyMacro" macro to copy the buffer
+  BufferCopyMacro 24
+
+  ; Restore the stack pointer from memory
+  ld sp, (CopyOfStackPointer)
+
+  ; Return from the subroutine
+  ret                    
