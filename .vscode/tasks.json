@@ -3,7 +3,7 @@
   "tasks": [
     {
       "label": "Compile Assembly",
-      "command": "${workspaceRoot}/project/bin/sjasmplus ${workspaceRoot}/project/src/myapp.asm --zxnext=cspect --msg=all --fullpath --lst --sld",
+      "command": "${workspaceRoot}/project/bin/sjasmplus ${workspaceRoot}/project/src/myapp.asm  --msg=all --fullpath --lst --sld",
       "type": "shell",
       "args": [],
       "problemMatcher": {

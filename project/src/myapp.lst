@@ -1,0 +1,2354 @@
+# file opened: /Users/darren/dev/spectrum/zx/project/src/myapp.asm
+  1   0000                device zxspectrum48
+  2   0000
+  3   0000              IM2_TABLE   = $FE00 ; IM2 interrupt vector table in decimal is 65024
+  4   0000              IM2_VECTOR  = $FDFD ; IM2 interrupt vector in decimal is 65021
+  5   0000
+  6   0000
+  7   0000                org 32768             ; Set the origin of the program to 32768 (the start of the BASIC area)
+  8   8000 C3 DD 88       jp start              ; Jump to the start of the program
+  9   8003
+ 10   8003                include "library/doubleBufferAttributes.asm"
+# file opened: /Users/darren/dev/spectrum/zx/project/src/library/doubleBufferAttributes.asm
+  1+  8003              ; add a copyright header with my name, description etc
+  2+  8003              ; *********************************************************************************************************************
+  3+  8003              ; Author:  Darren Bowles
+  4+  8003              ; Date:    2020-05-03
+  5+  8003              ; Purpose: This is a simple example of how to do double buffering with the screen attributes
+  6+  8003              ; It's the same style that Jonathan Cauldwell mentions as being used in Rallybug
+  7+  8003              ; see https://chuntey.wordpress.com/tag/double-buffering/ apart from i'm not doing screen memory (yet)
+  8+  8003              ; and it's using some sjasmplus macros
+  9+  8003              ; *********************************************************************************************************************
+ 10+  8003
+ 11+  8003              ; we'll need to keep a copy of the stack pointer, as we'll be moving it around
+ 12+  8003 00 00        CopyOfStackPointer: defw 0
+ 13+  8005
+ 14+  8005                  ; this macro copies over the screen attributes from the attribute buffer to the screen
+ 15+  8005                  macro DoCopy row, columnStart
+ 16+  8005 ~                    ; we move the stack pointer to our attribute buffer, with our offset row and columnStart
+ 17+  8005 ~                    ld sp, AttributeBuffer + (row * 32) + columnStart
+ 18+  8005 ~                    ; now we start popping the attributes off the 'stack'
+ 19+  8005 ~                    pop af                      ; 1,0
+ 20+  8005 ~                    pop bc                      ; 3,2
+ 21+  8005 ~                    pop de                      ; 5,4
+ 22+  8005 ~                    pop hl                      ; 7,6
+ 23+  8005 ~
+ 24+  8005 ~                    ; oops, we've run out of registers, so we need to swap to alternate registers
+ 25+  8005 ~                    ex af, af'                  ; swap af with af'
+ 26+  8005 ~                    exx
+ 27+  8005 ~
+ 28+  8005 ~                    ; carry on popping
+ 29+  8005 ~                    pop af                      ; 9,8
+ 30+  8005 ~                    pop bc                      ; 11,10
+ 31+  8005 ~                    pop de                      ; 13,12
+ 32+  8005 ~                    pop hl                      ; 15,14
+ 33+  8005 ~
+ 34+  8005 ~                    ; we move the stack pointer to the attribute screen memory, with our offset row and columnStart
+ 35+  8005 ~                    ; as well as including the 16 bytes that we popped off the buffer stack and stored
+ 36+  8005 ~                    ld sp, $5800 + (row * 32) + columnStart + 16
+ 37+  8005 ~
+ 38+  8005 ~                    ; we push back onto the screen memory stack in reverse order
+ 39+  8005 ~                    push hl                     ; copy 15,14 to the screen memory
+ 40+  8005 ~                    push de                     ; copy 13,12 to the screen memory
+ 41+  8005 ~                    push bc                     ; copy 11,10 to the screen memory
+ 42+  8005 ~                    push af                     ; copy 9,8 to the screen memory
+ 43+  8005 ~
+ 44+  8005 ~                    ; swap back to the original registers
+ 45+  8005 ~                    ex af, af'
+ 46+  8005 ~                    exx
+ 47+  8005 ~
+ 48+  8005 ~                    push hl                     ; copy 7,6 to the screen memory
+ 49+  8005 ~                    push de                     ; copy 5,4 to the screen memory
+ 50+  8005 ~                    push bc                     ; copy 3,2 to the screen memory
+ 51+  8005 ~                    push af                     ; copy 1,0 to the screen memory
+ 52+  8005                  endm
+ 53+  8005
+ 54+  8005                  ; this macro copies over a number of rows
+ 55+  8005                  macro BufferCopyMacro count
+ 56+  8005 ~                    rept count, i
+ 57+  8005 ~                        DoCopy i, 0   ; copy the first 16 attributes over to the row
+ 58+  8005 ~                        DoCopy i, 16  ; copy the remaining 16 attributes over to the row
+ 59+  8005 ~                    endr
+ 60+  8005                  endm
+ 61+  8005
+ 62+  8005                  ; this macro generates the lookup table for the attribute buffer
+ 63+  8005                  macro AttributeBufferLookupMacro count
+ 64+  8005 ~                    rept count, i
+ 65+  8005 ~                        defw AttributeBuffer + (32 * i)
+ 66+  8005 ~                    endr
+ 67+  8005                  endm
+ 68+  8005
+ 69+  8005              ; here's our buffer - let's initialise it to all white paper, black ink
+ 70+  8005              AttributeBuffer:
+ 71+  8005 38 38 38...      block 768, STABLE + DULL + WHITE_PAPER + BLACK_INK
+ 72+  8305
+ 73+  8305              ; here's our lookup table
+ 74+  8305              AttributeBufferLookup:
+ 75+  8305                  AttributeBufferLookupMacro 24;
+ 75+  8305             >        rept 24, i
+ 75+  8305 05 80       >            defw AttributeBuffer + (32 * i)
+ 75+  8307 25 80       >            defw AttributeBuffer + (32 * i)
+ 75+  8309 45 80       >            defw AttributeBuffer + (32 * i)
+ 75+  830B 65 80       >            defw AttributeBuffer + (32 * i)
+ 75+  830D 85 80       >            defw AttributeBuffer + (32 * i)
+ 75+  830F A5 80       >            defw AttributeBuffer + (32 * i)
+ 75+  8311 C5 80       >            defw AttributeBuffer + (32 * i)
+ 75+  8313 E5 80       >            defw AttributeBuffer + (32 * i)
+ 75+  8315 05 81       >            defw AttributeBuffer + (32 * i)
+ 75+  8317 25 81       >            defw AttributeBuffer + (32 * i)
+ 75+  8319 45 81       >            defw AttributeBuffer + (32 * i)
+ 75+  831B 65 81       >            defw AttributeBuffer + (32 * i)
+ 75+  831D 85 81       >            defw AttributeBuffer + (32 * i)
+ 75+  831F A5 81       >            defw AttributeBuffer + (32 * i)
+ 75+  8321 C5 81       >            defw AttributeBuffer + (32 * i)
+ 75+  8323 E5 81       >            defw AttributeBuffer + (32 * i)
+ 75+  8325 05 82       >            defw AttributeBuffer + (32 * i)
+ 75+  8327 25 82       >            defw AttributeBuffer + (32 * i)
+ 75+  8329 45 82       >            defw AttributeBuffer + (32 * i)
+ 75+  832B 65 82       >            defw AttributeBuffer + (32 * i)
+ 75+  832D 85 82       >            defw AttributeBuffer + (32 * i)
+ 75+  832F A5 82       >            defw AttributeBuffer + (32 * i)
+ 75+  8331 C5 82       >            defw AttributeBuffer + (32 * i)
+ 75+  8333 E5 82       >            defw AttributeBuffer + (32 * i)
+ 75+  8335             >        endr
+ 76+  8335
+ 77+  8335
+ 78+  8335              ; CalculateAttributeBufferAddress - Calculates the attribute buffer address for a given position (X, Y)
+ 79+  8335              ;
+ 80+  8335              ; Input:
+ 81+  8335              ;   B: X coordinate (0-31)
+ 82+  8335              ;   C: Y coordinate (0-23)
+ 83+  8335              ;
+ 84+  8335              ; Output:
+ 85+  8335              ;   HL: Attribute Buffer address
+ 86+  8335              ;
+ 87+  8335              CalculateAttributeBufferAddress:
+ 88+  8335                ; get the address of the lookup table
+ 89+  8335 21 05 83       ld hl,AttributeBufferLookup
+ 90+  8338
+ 91+  8338                ; double the Y coordinate
+ 92+  8338 79             ld a,c
+ 93+  8339 87             add a,a
+ 94+  833A 85             add a,l
+ 95+  833B 6F             ld l,a
+ 96+  833C
+ 97+  833C                ; get the table address for the Y coordinate
+ 98+  833C 5E 23 56 2B    ld de,(hl)
+ 99+  8340
+100+  8340                ; Add the X coordinate (in register B) to the table address (in register E)
+101+  8340 78             ld a,b
+102+  8341 83             add a,e
+103+  8342 5F             ld e,a
+104+  8343
+105+  8343                ; did we get a carry?  i.e. we exceeded 255?
+106+  8343 30 01          jr nc, .noCarry
+107+  8345 14             inc d
+108+  8346
+109+  8346              .noCarry:
+110+  8346                ; move the combined address into HL
+111+  8346 62 6B          ld hl,de
+112+  8348
+113+  8348 C9             ret
+114+  8349
+115+  8349
+116+  8349              ; Copy the attributes buffer to the screen attributes
+117+  8349              ; TODO: this is super crude, it just copies the lot over.  We can be more efficient
+118+  8349              copyScreenAttributes:
+119+  8349                ; TODO: i've disabled the interrupts here, as I don't want stack pointer to move around, not sure if this is necessary
+120+  8349 F3             di                            ; disable interrupts
+121+  834A ED 73 03 80    ld (CopyOfStackPointer), sp   ; save the current stack pointer to memory
+122+  834E                BufferCopyMacro 24            ; call the "BufferCopyMacro" macro with a count 24 rows
+122+  834E             >        rept 24, i
+122+  834E             >            DoCopy i, 0   ; copy the first 16 attributes over to the row
+122+  834E             >        ; we move the stack pointer to our attribute buffer, with our offset row and columnStart
+122+  834E 31 05 80    >        ld sp, AttributeBuffer + (i * 32) + 0
+122+  8351             >        ; now we start popping the attributes off the 'stack'
+122+  8351 F1          >        pop af                      ; 1,0
+122+  8352 C1          >        pop bc                      ; 3,2
+122+  8353 D1          >        pop de                      ; 5,4
+122+  8354 E1          >        pop hl                      ; 7,6
+122+  8355             >
+122+  8355             >        ; oops, we've run out of registers, so we need to swap to alternate registers
+122+  8355 08          >        ex af, af'                  ; swap af with af'
+122+  8356 D9          >        exx
+122+  8357             >
+122+  8357             >        ; carry on popping
+122+  8357 F1          >        pop af                      ; 9,8
+122+  8358 C1          >        pop bc                      ; 11,10
+122+  8359 D1          >        pop de                      ; 13,12
+122+  835A E1          >        pop hl                      ; 15,14
+122+  835B             >
+122+  835B             >        ; we move the stack pointer to the attribute screen memory, with our offset row and columnStart
+122+  835B             >        ; as well as including the 16 bytes that we popped off the buffer stack and stored
+122+  835B 31 10 58    >        ld sp, $5800 + (i * 32) + 0 + 16
+122+  835E             >
+122+  835E             >        ; we push back onto the screen memory stack in reverse order
+122+  835E E5          >        push hl                     ; copy 15,14 to the screen memory
+122+  835F D5          >        push de                     ; copy 13,12 to the screen memory
+122+  8360 C5          >        push bc                     ; copy 11,10 to the screen memory
+122+  8361 F5          >        push af                     ; copy 9,8 to the screen memory
+122+  8362             >
+122+  8362             >        ; swap back to the original registers
+122+  8362 08          >        ex af, af'
+122+  8363 D9          >        exx
+122+  8364             >
+122+  8364 E5          >        push hl                     ; copy 7,6 to the screen memory
+122+  8365 D5          >        push de                     ; copy 5,4 to the screen memory
+122+  8366 C5          >        push bc                     ; copy 3,2 to the screen memory
+122+  8367 F5          >        push af                     ; copy 1,0 to the screen memory
+122+  8368             >            DoCopy i, 16  ; copy the remaining 16 attributes over to the row
+122+  8368             >        ; we move the stack pointer to our attribute buffer, with our offset row and columnStart
+122+  8368 31 15 80    >        ld sp, AttributeBuffer + (i * 32) + 16
+122+  836B             >        ; now we start popping the attributes off the 'stack'
+122+  836B F1          >        pop af                      ; 1,0
+122+  836C C1          >        pop bc                      ; 3,2
+122+  836D D1          >        pop de                      ; 5,4
+122+  836E E1          >        pop hl                      ; 7,6
+122+  836F             >
+122+  836F             >        ; oops, we've run out of registers, so we need to swap to alternate registers
+122+  836F 08          >        ex af, af'                  ; swap af with af'
+122+  8370 D9          >        exx
+122+  8371             >
+122+  8371             >        ; carry on popping
+122+  8371 F1          >        pop af                      ; 9,8
+122+  8372 C1          >        pop bc                      ; 11,10
+122+  8373 D1          >        pop de                      ; 13,12
+122+  8374 E1          >        pop hl                      ; 15,14
+122+  8375             >
+122+  8375             >        ; we move the stack pointer to the attribute screen memory, with our offset row and columnStart
+122+  8375             >        ; as well as including the 16 bytes that we popped off the buffer stack and stored
+122+  8375 31 20 58    >        ld sp, $5800 + (i * 32) + 16 + 16
+122+  8378             >
+122+  8378             >        ; we push back onto the screen memory stack in reverse order
+122+  8378 E5          >        push hl                     ; copy 15,14 to the screen memory
+122+  8379 D5          >        push de                     ; copy 13,12 to the screen memory
+122+  837A C5          >        push bc                     ; copy 11,10 to the screen memory
+122+  837B F5          >        push af                     ; copy 9,8 to the screen memory
+122+  837C             >
+122+  837C             >        ; swap back to the original registers
+122+  837C 08          >        ex af, af'
+122+  837D D9          >        exx
+122+  837E             >
+122+  837E E5          >        push hl                     ; copy 7,6 to the screen memory
+122+  837F D5          >        push de                     ; copy 5,4 to the screen memory
+122+  8380 C5          >        push bc                     ; copy 3,2 to the screen memory
+122+  8381 F5          >        push af                     ; copy 1,0 to the screen memory
+122+  8382             >            DoCopy i, 0   ; copy the first 16 attributes over to the row
+122+  8382             >        ; we move the stack pointer to our attribute buffer, with our offset row and columnStart
+122+  8382 31 25 80    >        ld sp, AttributeBuffer + (i * 32) + 0
+122+  8385             >        ; now we start popping the attributes off the 'stack'
+122+  8385 F1          >        pop af                      ; 1,0
+122+  8386 C1          >        pop bc                      ; 3,2
+122+  8387 D1          >        pop de                      ; 5,4
+122+  8388 E1          >        pop hl                      ; 7,6
+122+  8389             >
+122+  8389             >        ; oops, we've run out of registers, so we need to swap to alternate registers
+122+  8389 08          >        ex af, af'                  ; swap af with af'
+122+  838A D9          >        exx
+122+  838B             >
+122+  838B             >        ; carry on popping
+122+  838B F1          >        pop af                      ; 9,8
+122+  838C C1          >        pop bc                      ; 11,10
+122+  838D D1          >        pop de                      ; 13,12
+122+  838E E1          >        pop hl                      ; 15,14
+122+  838F             >
+122+  838F             >        ; we move the stack pointer to the attribute screen memory, with our offset row and columnStart
+122+  838F             >        ; as well as including the 16 bytes that we popped off the buffer stack and stored
+122+  838F 31 30 58    >        ld sp, $5800 + (i * 32) + 0 + 16
+122+  8392             >
+122+  8392             >        ; we push back onto the screen memory stack in reverse order
+122+  8392 E5          >        push hl                     ; copy 15,14 to the screen memory
+122+  8393 D5          >        push de                     ; copy 13,12 to the screen memory
+122+  8394 C5          >        push bc                     ; copy 11,10 to the screen memory
+122+  8395 F5          >        push af                     ; copy 9,8 to the screen memory
+122+  8396             >
+122+  8396             >        ; swap back to the original registers
+122+  8396 08          >        ex af, af'
+122+  8397 D9          >        exx
+122+  8398             >
+122+  8398 E5          >        push hl                     ; copy 7,6 to the screen memory
+122+  8399 D5          >        push de                     ; copy 5,4 to the screen memory
+122+  839A C5          >        push bc                     ; copy 3,2 to the screen memory
+122+  839B F5          >        push af                     ; copy 1,0 to the screen memory
+122+  839C             >            DoCopy i, 16  ; copy the remaining 16 attributes over to the row
+122+  839C             >        ; we move the stack pointer to our attribute buffer, with our offset row and columnStart
+122+  839C 31 35 80    >        ld sp, AttributeBuffer + (i * 32) + 16
+122+  839F             >        ; now we start popping the attributes off the 'stack'
+122+  839F F1          >        pop af                      ; 1,0
+122+  83A0 C1          >        pop bc                      ; 3,2
+122+  83A1 D1          >        pop de                      ; 5,4
+122+  83A2 E1          >        pop hl                      ; 7,6
+122+  83A3             >
+122+  83A3             >        ; oops, we've run out of registers, so we need to swap to alternate registers
+122+  83A3 08          >        ex af, af'                  ; swap af with af'
+122+  83A4 D9          >        exx
+122+  83A5             >
+122+  83A5             >        ; carry on popping
+122+  83A5 F1          >        pop af                      ; 9,8
+122+  83A6 C1          >        pop bc                      ; 11,10
+122+  83A7 D1          >        pop de                      ; 13,12
+122+  83A8 E1          >        pop hl                      ; 15,14
+122+  83A9             >
+122+  83A9             >        ; we move the stack pointer to the attribute screen memory, with our offset row and columnStart
+122+  83A9             >        ; as well as including the 16 bytes that we popped off the buffer stack and stored
+122+  83A9 31 40 58    >        ld sp, $5800 + (i * 32) + 16 + 16
+122+  83AC             >
+122+  83AC             >        ; we push back onto the screen memory stack in reverse order
+122+  83AC E5          >        push hl                     ; copy 15,14 to the screen memory
+122+  83AD D5          >        push de                     ; copy 13,12 to the screen memory
+122+  83AE C5          >        push bc                     ; copy 11,10 to the screen memory
+122+  83AF F5          >        push af                     ; copy 9,8 to the screen memory
+122+  83B0             >
+122+  83B0             >        ; swap back to the original registers
+122+  83B0 08          >        ex af, af'
+122+  83B1 D9          >        exx
+122+  83B2             >
+122+  83B2 E5          >        push hl                     ; copy 7,6 to the screen memory
+122+  83B3 D5          >        push de                     ; copy 5,4 to the screen memory
+122+  83B4 C5          >        push bc                     ; copy 3,2 to the screen memory
+122+  83B5 F5          >        push af                     ; copy 1,0 to the screen memory
+122+  83B6             >            DoCopy i, 0   ; copy the first 16 attributes over to the row
+122+  83B6             >        ; we move the stack pointer to our attribute buffer, with our offset row and columnStart
+122+  83B6 31 45 80    >        ld sp, AttributeBuffer + (i * 32) + 0
+122+  83B9             >        ; now we start popping the attributes off the 'stack'
+122+  83B9 F1          >        pop af                      ; 1,0
+122+  83BA C1          >        pop bc                      ; 3,2
+122+  83BB D1          >        pop de                      ; 5,4
+122+  83BC E1          >        pop hl                      ; 7,6
+122+  83BD             >
+122+  83BD             >        ; oops, we've run out of registers, so we need to swap to alternate registers
+122+  83BD 08          >        ex af, af'                  ; swap af with af'
+122+  83BE D9          >        exx
+122+  83BF             >
+122+  83BF             >        ; carry on popping
+122+  83BF F1          >        pop af                      ; 9,8
+122+  83C0 C1          >        pop bc                      ; 11,10
+122+  83C1 D1          >        pop de                      ; 13,12
+122+  83C2 E1          >        pop hl                      ; 15,14
+122+  83C3             >
+122+  83C3             >        ; we move the stack pointer to the attribute screen memory, with our offset row and columnStart
+122+  83C3             >        ; as well as including the 16 bytes that we popped off the buffer stack and stored
+122+  83C3 31 50 58    >        ld sp, $5800 + (i * 32) + 0 + 16
+122+  83C6             >
+122+  83C6             >        ; we push back onto the screen memory stack in reverse order
+122+  83C6 E5          >        push hl                     ; copy 15,14 to the screen memory
+122+  83C7 D5          >        push de                     ; copy 13,12 to the screen memory
+122+  83C8 C5          >        push bc                     ; copy 11,10 to the screen memory
+122+  83C9 F5          >        push af                     ; copy 9,8 to the screen memory
+122+  83CA             >
+122+  83CA             >        ; swap back to the original registers
+122+  83CA 08          >        ex af, af'
+122+  83CB D9          >        exx
+122+  83CC             >
+122+  83CC E5          >        push hl                     ; copy 7,6 to the screen memory
+122+  83CD D5          >        push de                     ; copy 5,4 to the screen memory
+122+  83CE C5          >        push bc                     ; copy 3,2 to the screen memory
+122+  83CF F5          >        push af                     ; copy 1,0 to the screen memory
+122+  83D0             >            DoCopy i, 16  ; copy the remaining 16 attributes over to the row
+122+  83D0             >        ; we move the stack pointer to our attribute buffer, with our offset row and columnStart
+122+  83D0 31 55 80    >        ld sp, AttributeBuffer + (i * 32) + 16
+122+  83D3             >        ; now we start popping the attributes off the 'stack'
+122+  83D3 F1          >        pop af                      ; 1,0
+122+  83D4 C1          >        pop bc                      ; 3,2
+122+  83D5 D1          >        pop de                      ; 5,4
+122+  83D6 E1          >        pop hl                      ; 7,6
+122+  83D7             >
+122+  83D7             >        ; oops, we've run out of registers, so we need to swap to alternate registers
+122+  83D7 08          >        ex af, af'                  ; swap af with af'
+122+  83D8 D9          >        exx
+122+  83D9             >
+122+  83D9             >        ; carry on popping
+122+  83D9 F1          >        pop af                      ; 9,8
+122+  83DA C1          >        pop bc                      ; 11,10
+122+  83DB D1          >        pop de                      ; 13,12
+122+  83DC E1          >        pop hl                      ; 15,14
+122+  83DD             >
+122+  83DD             >        ; we move the stack pointer to the attribute screen memory, with our offset row and columnStart
+122+  83DD             >        ; as well as including the 16 bytes that we popped off the buffer stack and stored
+122+  83DD 31 60 58    >        ld sp, $5800 + (i * 32) + 16 + 16
+122+  83E0             >
+122+  83E0             >        ; we push back onto the screen memory stack in reverse order
+122+  83E0 E5          >        push hl                     ; copy 15,14 to the screen memory
+122+  83E1 D5          >        push de                     ; copy 13,12 to the screen memory
+122+  83E2 C5          >        push bc                     ; copy 11,10 to the screen memory
+122+  83E3 F5          >        push af                     ; copy 9,8 to the screen memory
+122+  83E4             >
+122+  83E4             >        ; swap back to the original registers
+122+  83E4 08          >        ex af, af'
+122+  83E5 D9          >        exx
+122+  83E6             >
+122+  83E6 E5          >        push hl                     ; copy 7,6 to the screen memory
+122+  83E7 D5          >        push de                     ; copy 5,4 to the screen memory
+122+  83E8 C5          >        push bc                     ; copy 3,2 to the screen memory
+122+  83E9 F5          >        push af                     ; copy 1,0 to the screen memory
+122+  83EA             >            DoCopy i, 0   ; copy the first 16 attributes over to the row
+122+  83EA             >        ; we move the stack pointer to our attribute buffer, with our offset row and columnStart
+122+  83EA 31 65 80    >        ld sp, AttributeBuffer + (i * 32) + 0
+122+  83ED             >        ; now we start popping the attributes off the 'stack'
+122+  83ED F1          >        pop af                      ; 1,0
+122+  83EE C1          >        pop bc                      ; 3,2
+122+  83EF D1          >        pop de                      ; 5,4
+122+  83F0 E1          >        pop hl                      ; 7,6
+122+  83F1             >
+122+  83F1             >        ; oops, we've run out of registers, so we need to swap to alternate registers
+122+  83F1 08          >        ex af, af'                  ; swap af with af'
+122+  83F2 D9          >        exx
+122+  83F3             >
+122+  83F3             >        ; carry on popping
+122+  83F3 F1          >        pop af                      ; 9,8
+122+  83F4 C1          >        pop bc                      ; 11,10
+122+  83F5 D1          >        pop de                      ; 13,12
+122+  83F6 E1          >        pop hl                      ; 15,14
+122+  83F7             >
+122+  83F7             >        ; we move the stack pointer to the attribute screen memory, with our offset row and columnStart
+122+  83F7             >        ; as well as including the 16 bytes that we popped off the buffer stack and stored
+122+  83F7 31 70 58    >        ld sp, $5800 + (i * 32) + 0 + 16
+122+  83FA             >
+122+  83FA             >        ; we push back onto the screen memory stack in reverse order
+122+  83FA E5          >        push hl                     ; copy 15,14 to the screen memory
+122+  83FB D5          >        push de                     ; copy 13,12 to the screen memory
+122+  83FC C5          >        push bc                     ; copy 11,10 to the screen memory
+122+  83FD F5          >        push af                     ; copy 9,8 to the screen memory
+122+  83FE             >
+122+  83FE             >        ; swap back to the original registers
+122+  83FE 08          >        ex af, af'
+122+  83FF D9          >        exx
+122+  8400             >
+122+  8400 E5          >        push hl                     ; copy 7,6 to the screen memory
+122+  8401 D5          >        push de                     ; copy 5,4 to the screen memory
+122+  8402 C5          >        push bc                     ; copy 3,2 to the screen memory
+122+  8403 F5          >        push af                     ; copy 1,0 to the screen memory
+122+  8404             >            DoCopy i, 16  ; copy the remaining 16 attributes over to the row
+122+  8404             >        ; we move the stack pointer to our attribute buffer, with our offset row and columnStart
+122+  8404 31 75 80    >        ld sp, AttributeBuffer + (i * 32) + 16
+122+  8407             >        ; now we start popping the attributes off the 'stack'
+122+  8407 F1          >        pop af                      ; 1,0
+122+  8408 C1          >        pop bc                      ; 3,2
+122+  8409 D1          >        pop de                      ; 5,4
+122+  840A E1          >        pop hl                      ; 7,6
+122+  840B             >
+122+  840B             >        ; oops, we've run out of registers, so we need to swap to alternate registers
+122+  840B 08          >        ex af, af'                  ; swap af with af'
+122+  840C D9          >        exx
+122+  840D             >
+122+  840D             >        ; carry on popping
+122+  840D F1          >        pop af                      ; 9,8
+122+  840E C1          >        pop bc                      ; 11,10
+122+  840F D1          >        pop de                      ; 13,12
+122+  8410 E1          >        pop hl                      ; 15,14
+122+  8411             >
+122+  8411             >        ; we move the stack pointer to the attribute screen memory, with our offset row and columnStart
+122+  8411             >        ; as well as including the 16 bytes that we popped off the buffer stack and stored
+122+  8411 31 80 58    >        ld sp, $5800 + (i * 32) + 16 + 16
+122+  8414             >
+122+  8414             >        ; we push back onto the screen memory stack in reverse order
+122+  8414 E5          >        push hl                     ; copy 15,14 to the screen memory
+122+  8415 D5          >        push de                     ; copy 13,12 to the screen memory
+122+  8416 C5          >        push bc                     ; copy 11,10 to the screen memory
+122+  8417 F5          >        push af                     ; copy 9,8 to the screen memory
+122+  8418             >
+122+  8418             >        ; swap back to the original registers
+122+  8418 08          >        ex af, af'
+122+  8419 D9          >        exx
+122+  841A             >
+122+  841A E5          >        push hl                     ; copy 7,6 to the screen memory
+122+  841B D5          >        push de                     ; copy 5,4 to the screen memory
+122+  841C C5          >        push bc                     ; copy 3,2 to the screen memory
+122+  841D F5          >        push af                     ; copy 1,0 to the screen memory
+122+  841E             >            DoCopy i, 0   ; copy the first 16 attributes over to the row
+122+  841E             >        ; we move the stack pointer to our attribute buffer, with our offset row and columnStart
+122+  841E 31 85 80    >        ld sp, AttributeBuffer + (i * 32) + 0
+122+  8421             >        ; now we start popping the attributes off the 'stack'
+122+  8421 F1          >        pop af                      ; 1,0
+122+  8422 C1          >        pop bc                      ; 3,2
+122+  8423 D1          >        pop de                      ; 5,4
+122+  8424 E1          >        pop hl                      ; 7,6
+122+  8425             >
+122+  8425             >        ; oops, we've run out of registers, so we need to swap to alternate registers
+122+  8425 08          >        ex af, af'                  ; swap af with af'
+122+  8426 D9          >        exx
+122+  8427             >
+122+  8427             >        ; carry on popping
+122+  8427 F1          >        pop af                      ; 9,8
+122+  8428 C1          >        pop bc                      ; 11,10
+122+  8429 D1          >        pop de                      ; 13,12
+122+  842A E1          >        pop hl                      ; 15,14
+122+  842B             >
+122+  842B             >        ; we move the stack pointer to the attribute screen memory, with our offset row and columnStart
+122+  842B             >        ; as well as including the 16 bytes that we popped off the buffer stack and stored
+122+  842B 31 90 58    >        ld sp, $5800 + (i * 32) + 0 + 16
+122+  842E             >
+122+  842E             >        ; we push back onto the screen memory stack in reverse order
+122+  842E E5          >        push hl                     ; copy 15,14 to the screen memory
+122+  842F D5          >        push de                     ; copy 13,12 to the screen memory
+122+  8430 C5          >        push bc                     ; copy 11,10 to the screen memory
+122+  8431 F5          >        push af                     ; copy 9,8 to the screen memory
+122+  8432             >
+122+  8432             >        ; swap back to the original registers
+122+  8432 08          >        ex af, af'
+122+  8433 D9          >        exx
+122+  8434             >
+122+  8434 E5          >        push hl                     ; copy 7,6 to the screen memory
+122+  8435 D5          >        push de                     ; copy 5,4 to the screen memory
+122+  8436 C5          >        push bc                     ; copy 3,2 to the screen memory
+122+  8437 F5          >        push af                     ; copy 1,0 to the screen memory
+122+  8438             >            DoCopy i, 16  ; copy the remaining 16 attributes over to the row
+122+  8438             >        ; we move the stack pointer to our attribute buffer, with our offset row and columnStart
+122+  8438 31 95 80    >        ld sp, AttributeBuffer + (i * 32) + 16
+122+  843B             >        ; now we start popping the attributes off the 'stack'
+122+  843B F1          >        pop af                      ; 1,0
+122+  843C C1          >        pop bc                      ; 3,2
+122+  843D D1          >        pop de                      ; 5,4
+122+  843E E1          >        pop hl                      ; 7,6
+122+  843F             >
+122+  843F             >        ; oops, we've run out of registers, so we need to swap to alternate registers
+122+  843F 08          >        ex af, af'                  ; swap af with af'
+122+  8440 D9          >        exx
+122+  8441             >
+122+  8441             >        ; carry on popping
+122+  8441 F1          >        pop af                      ; 9,8
+122+  8442 C1          >        pop bc                      ; 11,10
+122+  8443 D1          >        pop de                      ; 13,12
+122+  8444 E1          >        pop hl                      ; 15,14
+122+  8445             >
+122+  8445             >        ; we move the stack pointer to the attribute screen memory, with our offset row and columnStart
+122+  8445             >        ; as well as including the 16 bytes that we popped off the buffer stack and stored
+122+  8445 31 A0 58    >        ld sp, $5800 + (i * 32) + 16 + 16
+122+  8448             >
+122+  8448             >        ; we push back onto the screen memory stack in reverse order
+122+  8448 E5          >        push hl                     ; copy 15,14 to the screen memory
+122+  8449 D5          >        push de                     ; copy 13,12 to the screen memory
+122+  844A C5          >        push bc                     ; copy 11,10 to the screen memory
+122+  844B F5          >        push af                     ; copy 9,8 to the screen memory
+122+  844C             >
+122+  844C             >        ; swap back to the original registers
+122+  844C 08          >        ex af, af'
+122+  844D D9          >        exx
+122+  844E             >
+122+  844E E5          >        push hl                     ; copy 7,6 to the screen memory
+122+  844F D5          >        push de                     ; copy 5,4 to the screen memory
+122+  8450 C5          >        push bc                     ; copy 3,2 to the screen memory
+122+  8451 F5          >        push af                     ; copy 1,0 to the screen memory
+122+  8452             >            DoCopy i, 0   ; copy the first 16 attributes over to the row
+122+  8452             >        ; we move the stack pointer to our attribute buffer, with our offset row and columnStart
+122+  8452 31 A5 80    >        ld sp, AttributeBuffer + (i * 32) + 0
+122+  8455             >        ; now we start popping the attributes off the 'stack'
+122+  8455 F1          >        pop af                      ; 1,0
+122+  8456 C1          >        pop bc                      ; 3,2
+122+  8457 D1          >        pop de                      ; 5,4
+122+  8458 E1          >        pop hl                      ; 7,6
+122+  8459             >
+122+  8459             >        ; oops, we've run out of registers, so we need to swap to alternate registers
+122+  8459 08          >        ex af, af'                  ; swap af with af'
+122+  845A D9          >        exx
+122+  845B             >
+122+  845B             >        ; carry on popping
+122+  845B F1          >        pop af                      ; 9,8
+122+  845C C1          >        pop bc                      ; 11,10
+122+  845D D1          >        pop de                      ; 13,12
+122+  845E E1          >        pop hl                      ; 15,14
+122+  845F             >
+122+  845F             >        ; we move the stack pointer to the attribute screen memory, with our offset row and columnStart
+122+  845F             >        ; as well as including the 16 bytes that we popped off the buffer stack and stored
+122+  845F 31 B0 58    >        ld sp, $5800 + (i * 32) + 0 + 16
+122+  8462             >
+122+  8462             >        ; we push back onto the screen memory stack in reverse order
+122+  8462 E5          >        push hl                     ; copy 15,14 to the screen memory
+122+  8463 D5          >        push de                     ; copy 13,12 to the screen memory
+122+  8464 C5          >        push bc                     ; copy 11,10 to the screen memory
+122+  8465 F5          >        push af                     ; copy 9,8 to the screen memory
+122+  8466             >
+122+  8466             >        ; swap back to the original registers
+122+  8466 08          >        ex af, af'
+122+  8467 D9          >        exx
+122+  8468             >
+122+  8468 E5          >        push hl                     ; copy 7,6 to the screen memory
+122+  8469 D5          >        push de                     ; copy 5,4 to the screen memory
+122+  846A C5          >        push bc                     ; copy 3,2 to the screen memory
+122+  846B F5          >        push af                     ; copy 1,0 to the screen memory
+122+  846C             >            DoCopy i, 16  ; copy the remaining 16 attributes over to the row
+122+  846C             >        ; we move the stack pointer to our attribute buffer, with our offset row and columnStart
+122+  846C 31 B5 80    >        ld sp, AttributeBuffer + (i * 32) + 16
+122+  846F             >        ; now we start popping the attributes off the 'stack'
+122+  846F F1          >        pop af                      ; 1,0
+122+  8470 C1          >        pop bc                      ; 3,2
+122+  8471 D1          >        pop de                      ; 5,4
+122+  8472 E1          >        pop hl                      ; 7,6
+122+  8473             >
+122+  8473             >        ; oops, we've run out of registers, so we need to swap to alternate registers
+122+  8473 08          >        ex af, af'                  ; swap af with af'
+122+  8474 D9          >        exx
+122+  8475             >
+122+  8475             >        ; carry on popping
+122+  8475 F1          >        pop af                      ; 9,8
+122+  8476 C1          >        pop bc                      ; 11,10
+122+  8477 D1          >        pop de                      ; 13,12
+122+  8478 E1          >        pop hl                      ; 15,14
+122+  8479             >
+122+  8479             >        ; we move the stack pointer to the attribute screen memory, with our offset row and columnStart
+122+  8479             >        ; as well as including the 16 bytes that we popped off the buffer stack and stored
+122+  8479 31 C0 58    >        ld sp, $5800 + (i * 32) + 16 + 16
+122+  847C             >
+122+  847C             >        ; we push back onto the screen memory stack in reverse order
+122+  847C E5          >        push hl                     ; copy 15,14 to the screen memory
+122+  847D D5          >        push de                     ; copy 13,12 to the screen memory
+122+  847E C5          >        push bc                     ; copy 11,10 to the screen memory
+122+  847F F5          >        push af                     ; copy 9,8 to the screen memory
+122+  8480             >
+122+  8480             >        ; swap back to the original registers
+122+  8480 08          >        ex af, af'
+122+  8481 D9          >        exx
+122+  8482             >
+122+  8482 E5          >        push hl                     ; copy 7,6 to the screen memory
+122+  8483 D5          >        push de                     ; copy 5,4 to the screen memory
+122+  8484 C5          >        push bc                     ; copy 3,2 to the screen memory
+122+  8485 F5          >        push af                     ; copy 1,0 to the screen memory
+122+  8486             >            DoCopy i, 0   ; copy the first 16 attributes over to the row
+122+  8486             >        ; we move the stack pointer to our attribute buffer, with our offset row and columnStart
+122+  8486 31 C5 80    >        ld sp, AttributeBuffer + (i * 32) + 0
+122+  8489             >        ; now we start popping the attributes off the 'stack'
+122+  8489 F1          >        pop af                      ; 1,0
+122+  848A C1          >        pop bc                      ; 3,2
+122+  848B D1          >        pop de                      ; 5,4
+122+  848C E1          >        pop hl                      ; 7,6
+122+  848D             >
+122+  848D             >        ; oops, we've run out of registers, so we need to swap to alternate registers
+122+  848D 08          >        ex af, af'                  ; swap af with af'
+122+  848E D9          >        exx
+122+  848F             >
+122+  848F             >        ; carry on popping
+122+  848F F1          >        pop af                      ; 9,8
+122+  8490 C1          >        pop bc                      ; 11,10
+122+  8491 D1          >        pop de                      ; 13,12
+122+  8492 E1          >        pop hl                      ; 15,14
+122+  8493             >
+122+  8493             >        ; we move the stack pointer to the attribute screen memory, with our offset row and columnStart
+122+  8493             >        ; as well as including the 16 bytes that we popped off the buffer stack and stored
+122+  8493 31 D0 58    >        ld sp, $5800 + (i * 32) + 0 + 16
+122+  8496             >
+122+  8496             >        ; we push back onto the screen memory stack in reverse order
+122+  8496 E5          >        push hl                     ; copy 15,14 to the screen memory
+122+  8497 D5          >        push de                     ; copy 13,12 to the screen memory
+122+  8498 C5          >        push bc                     ; copy 11,10 to the screen memory
+122+  8499 F5          >        push af                     ; copy 9,8 to the screen memory
+122+  849A             >
+122+  849A             >        ; swap back to the original registers
+122+  849A 08          >        ex af, af'
+122+  849B D9          >        exx
+122+  849C             >
+122+  849C E5          >        push hl                     ; copy 7,6 to the screen memory
+122+  849D D5          >        push de                     ; copy 5,4 to the screen memory
+122+  849E C5          >        push bc                     ; copy 3,2 to the screen memory
+122+  849F F5          >        push af                     ; copy 1,0 to the screen memory
+122+  84A0             >            DoCopy i, 16  ; copy the remaining 16 attributes over to the row
+122+  84A0             >        ; we move the stack pointer to our attribute buffer, with our offset row and columnStart
+122+  84A0 31 D5 80    >        ld sp, AttributeBuffer + (i * 32) + 16
+122+  84A3             >        ; now we start popping the attributes off the 'stack'
+122+  84A3 F1          >        pop af                      ; 1,0
+122+  84A4 C1          >        pop bc                      ; 3,2
+122+  84A5 D1          >        pop de                      ; 5,4
+122+  84A6 E1          >        pop hl                      ; 7,6
+122+  84A7             >
+122+  84A7             >        ; oops, we've run out of registers, so we need to swap to alternate registers
+122+  84A7 08          >        ex af, af'                  ; swap af with af'
+122+  84A8 D9          >        exx
+122+  84A9             >
+122+  84A9             >        ; carry on popping
+122+  84A9 F1          >        pop af                      ; 9,8
+122+  84AA C1          >        pop bc                      ; 11,10
+122+  84AB D1          >        pop de                      ; 13,12
+122+  84AC E1          >        pop hl                      ; 15,14
+122+  84AD             >
+122+  84AD             >        ; we move the stack pointer to the attribute screen memory, with our offset row and columnStart
+122+  84AD             >        ; as well as including the 16 bytes that we popped off the buffer stack and stored
+122+  84AD 31 E0 58    >        ld sp, $5800 + (i * 32) + 16 + 16
+122+  84B0             >
+122+  84B0             >        ; we push back onto the screen memory stack in reverse order
+122+  84B0 E5          >        push hl                     ; copy 15,14 to the screen memory
+122+  84B1 D5          >        push de                     ; copy 13,12 to the screen memory
+122+  84B2 C5          >        push bc                     ; copy 11,10 to the screen memory
+122+  84B3 F5          >        push af                     ; copy 9,8 to the screen memory
+122+  84B4             >
+122+  84B4             >        ; swap back to the original registers
+122+  84B4 08          >        ex af, af'
+122+  84B5 D9          >        exx
+122+  84B6             >
+122+  84B6 E5          >        push hl                     ; copy 7,6 to the screen memory
+122+  84B7 D5          >        push de                     ; copy 5,4 to the screen memory
+122+  84B8 C5          >        push bc                     ; copy 3,2 to the screen memory
+122+  84B9 F5          >        push af                     ; copy 1,0 to the screen memory
+122+  84BA             >            DoCopy i, 0   ; copy the first 16 attributes over to the row
+122+  84BA             >        ; we move the stack pointer to our attribute buffer, with our offset row and columnStart
+122+  84BA 31 E5 80    >        ld sp, AttributeBuffer + (i * 32) + 0
+122+  84BD             >        ; now we start popping the attributes off the 'stack'
+122+  84BD F1          >        pop af                      ; 1,0
+122+  84BE C1          >        pop bc                      ; 3,2
+122+  84BF D1          >        pop de                      ; 5,4
+122+  84C0 E1          >        pop hl                      ; 7,6
+122+  84C1             >
+122+  84C1             >        ; oops, we've run out of registers, so we need to swap to alternate registers
+122+  84C1 08          >        ex af, af'                  ; swap af with af'
+122+  84C2 D9          >        exx
+122+  84C3             >
+122+  84C3             >        ; carry on popping
+122+  84C3 F1          >        pop af                      ; 9,8
+122+  84C4 C1          >        pop bc                      ; 11,10
+122+  84C5 D1          >        pop de                      ; 13,12
+122+  84C6 E1          >        pop hl                      ; 15,14
+122+  84C7             >
+122+  84C7             >        ; we move the stack pointer to the attribute screen memory, with our offset row and columnStart
+122+  84C7             >        ; as well as including the 16 bytes that we popped off the buffer stack and stored
+122+  84C7 31 F0 58    >        ld sp, $5800 + (i * 32) + 0 + 16
+122+  84CA             >
+122+  84CA             >        ; we push back onto the screen memory stack in reverse order
+122+  84CA E5          >        push hl                     ; copy 15,14 to the screen memory
+122+  84CB D5          >        push de                     ; copy 13,12 to the screen memory
+122+  84CC C5          >        push bc                     ; copy 11,10 to the screen memory
+122+  84CD F5          >        push af                     ; copy 9,8 to the screen memory
+122+  84CE             >
+122+  84CE             >        ; swap back to the original registers
+122+  84CE 08          >        ex af, af'
+122+  84CF D9          >        exx
+122+  84D0             >
+122+  84D0 E5          >        push hl                     ; copy 7,6 to the screen memory
+122+  84D1 D5          >        push de                     ; copy 5,4 to the screen memory
+122+  84D2 C5          >        push bc                     ; copy 3,2 to the screen memory
+122+  84D3 F5          >        push af                     ; copy 1,0 to the screen memory
+122+  84D4             >            DoCopy i, 16  ; copy the remaining 16 attributes over to the row
+122+  84D4             >        ; we move the stack pointer to our attribute buffer, with our offset row and columnStart
+122+  84D4 31 F5 80    >        ld sp, AttributeBuffer + (i * 32) + 16
+122+  84D7             >        ; now we start popping the attributes off the 'stack'
+122+  84D7 F1          >        pop af                      ; 1,0
+122+  84D8 C1          >        pop bc                      ; 3,2
+122+  84D9 D1          >        pop de                      ; 5,4
+122+  84DA E1          >        pop hl                      ; 7,6
+122+  84DB             >
+122+  84DB             >        ; oops, we've run out of registers, so we need to swap to alternate registers
+122+  84DB 08          >        ex af, af'                  ; swap af with af'
+122+  84DC D9          >        exx
+122+  84DD             >
+122+  84DD             >        ; carry on popping
+122+  84DD F1          >        pop af                      ; 9,8
+122+  84DE C1          >        pop bc                      ; 11,10
+122+  84DF D1          >        pop de                      ; 13,12
+122+  84E0 E1          >        pop hl                      ; 15,14
+122+  84E1             >
+122+  84E1             >        ; we move the stack pointer to the attribute screen memory, with our offset row and columnStart
+122+  84E1             >        ; as well as including the 16 bytes that we popped off the buffer stack and stored
+122+  84E1 31 00 59    >        ld sp, $5800 + (i * 32) + 16 + 16
+122+  84E4             >
+122+  84E4             >        ; we push back onto the screen memory stack in reverse order
+122+  84E4 E5          >        push hl                     ; copy 15,14 to the screen memory
+122+  84E5 D5          >        push de                     ; copy 13,12 to the screen memory
+122+  84E6 C5          >        push bc                     ; copy 11,10 to the screen memory
+122+  84E7 F5          >        push af                     ; copy 9,8 to the screen memory
+122+  84E8             >
+122+  84E8             >        ; swap back to the original registers
+122+  84E8 08          >        ex af, af'
+122+  84E9 D9          >        exx
+122+  84EA             >
+122+  84EA E5          >        push hl                     ; copy 7,6 to the screen memory
+122+  84EB D5          >        push de                     ; copy 5,4 to the screen memory
+122+  84EC C5          >        push bc                     ; copy 3,2 to the screen memory
+122+  84ED F5          >        push af                     ; copy 1,0 to the screen memory
+122+  84EE             >            DoCopy i, 0   ; copy the first 16 attributes over to the row
+122+  84EE             >        ; we move the stack pointer to our attribute buffer, with our offset row and columnStart
+122+  84EE 31 05 81    >        ld sp, AttributeBuffer + (i * 32) + 0
+122+  84F1             >        ; now we start popping the attributes off the 'stack'
+122+  84F1 F1          >        pop af                      ; 1,0
+122+  84F2 C1          >        pop bc                      ; 3,2
+122+  84F3 D1          >        pop de                      ; 5,4
+122+  84F4 E1          >        pop hl                      ; 7,6
+122+  84F5             >
+122+  84F5             >        ; oops, we've run out of registers, so we need to swap to alternate registers
+122+  84F5 08          >        ex af, af'                  ; swap af with af'
+122+  84F6 D9          >        exx
+122+  84F7             >
+122+  84F7             >        ; carry on popping
+122+  84F7 F1          >        pop af                      ; 9,8
+122+  84F8 C1          >        pop bc                      ; 11,10
+122+  84F9 D1          >        pop de                      ; 13,12
+122+  84FA E1          >        pop hl                      ; 15,14
+122+  84FB             >
+122+  84FB             >        ; we move the stack pointer to the attribute screen memory, with our offset row and columnStart
+122+  84FB             >        ; as well as including the 16 bytes that we popped off the buffer stack and stored
+122+  84FB 31 10 59    >        ld sp, $5800 + (i * 32) + 0 + 16
+122+  84FE             >
+122+  84FE             >        ; we push back onto the screen memory stack in reverse order
+122+  84FE E5          >        push hl                     ; copy 15,14 to the screen memory
+122+  84FF D5          >        push de                     ; copy 13,12 to the screen memory
+122+  8500 C5          >        push bc                     ; copy 11,10 to the screen memory
+122+  8501 F5          >        push af                     ; copy 9,8 to the screen memory
+122+  8502             >
+122+  8502             >        ; swap back to the original registers
+122+  8502 08          >        ex af, af'
+122+  8503 D9          >        exx
+122+  8504             >
+122+  8504 E5          >        push hl                     ; copy 7,6 to the screen memory
+122+  8505 D5          >        push de                     ; copy 5,4 to the screen memory
+122+  8506 C5          >        push bc                     ; copy 3,2 to the screen memory
+122+  8507 F5          >        push af                     ; copy 1,0 to the screen memory
+122+  8508             >            DoCopy i, 16  ; copy the remaining 16 attributes over to the row
+122+  8508             >        ; we move the stack pointer to our attribute buffer, with our offset row and columnStart
+122+  8508 31 15 81    >        ld sp, AttributeBuffer + (i * 32) + 16
+122+  850B             >        ; now we start popping the attributes off the 'stack'
+122+  850B F1          >        pop af                      ; 1,0
+122+  850C C1          >        pop bc                      ; 3,2
+122+  850D D1          >        pop de                      ; 5,4
+122+  850E E1          >        pop hl                      ; 7,6
+122+  850F             >
+122+  850F             >        ; oops, we've run out of registers, so we need to swap to alternate registers
+122+  850F 08          >        ex af, af'                  ; swap af with af'
+122+  8510 D9          >        exx
+122+  8511             >
+122+  8511             >        ; carry on popping
+122+  8511 F1          >        pop af                      ; 9,8
+122+  8512 C1          >        pop bc                      ; 11,10
+122+  8513 D1          >        pop de                      ; 13,12
+122+  8514 E1          >        pop hl                      ; 15,14
+122+  8515             >
+122+  8515             >        ; we move the stack pointer to the attribute screen memory, with our offset row and columnStart
+122+  8515             >        ; as well as including the 16 bytes that we popped off the buffer stack and stored
+122+  8515 31 20 59    >        ld sp, $5800 + (i * 32) + 16 + 16
+122+  8518             >
+122+  8518             >        ; we push back onto the screen memory stack in reverse order
+122+  8518 E5          >        push hl                     ; copy 15,14 to the screen memory
+122+  8519 D5          >        push de                     ; copy 13,12 to the screen memory
+122+  851A C5          >        push bc                     ; copy 11,10 to the screen memory
+122+  851B F5          >        push af                     ; copy 9,8 to the screen memory
+122+  851C             >
+122+  851C             >        ; swap back to the original registers
+122+  851C 08          >        ex af, af'
+122+  851D D9          >        exx
+122+  851E             >
+122+  851E E5          >        push hl                     ; copy 7,6 to the screen memory
+122+  851F D5          >        push de                     ; copy 5,4 to the screen memory
+122+  8520 C5          >        push bc                     ; copy 3,2 to the screen memory
+122+  8521 F5          >        push af                     ; copy 1,0 to the screen memory
+122+  8522             >            DoCopy i, 0   ; copy the first 16 attributes over to the row
+122+  8522             >        ; we move the stack pointer to our attribute buffer, with our offset row and columnStart
+122+  8522 31 25 81    >        ld sp, AttributeBuffer + (i * 32) + 0
+122+  8525             >        ; now we start popping the attributes off the 'stack'
+122+  8525 F1          >        pop af                      ; 1,0
+122+  8526 C1          >        pop bc                      ; 3,2
+122+  8527 D1          >        pop de                      ; 5,4
+122+  8528 E1          >        pop hl                      ; 7,6
+122+  8529             >
+122+  8529             >        ; oops, we've run out of registers, so we need to swap to alternate registers
+122+  8529 08          >        ex af, af'                  ; swap af with af'
+122+  852A D9          >        exx
+122+  852B             >
+122+  852B             >        ; carry on popping
+122+  852B F1          >        pop af                      ; 9,8
+122+  852C C1          >        pop bc                      ; 11,10
+122+  852D D1          >        pop de                      ; 13,12
+122+  852E E1          >        pop hl                      ; 15,14
+122+  852F             >
+122+  852F             >        ; we move the stack pointer to the attribute screen memory, with our offset row and columnStart
+122+  852F             >        ; as well as including the 16 bytes that we popped off the buffer stack and stored
+122+  852F 31 30 59    >        ld sp, $5800 + (i * 32) + 0 + 16
+122+  8532             >
+122+  8532             >        ; we push back onto the screen memory stack in reverse order
+122+  8532 E5          >        push hl                     ; copy 15,14 to the screen memory
+122+  8533 D5          >        push de                     ; copy 13,12 to the screen memory
+122+  8534 C5          >        push bc                     ; copy 11,10 to the screen memory
+122+  8535 F5          >        push af                     ; copy 9,8 to the screen memory
+122+  8536             >
+122+  8536             >        ; swap back to the original registers
+122+  8536 08          >        ex af, af'
+122+  8537 D9          >        exx
+122+  8538             >
+122+  8538 E5          >        push hl                     ; copy 7,6 to the screen memory
+122+  8539 D5          >        push de                     ; copy 5,4 to the screen memory
+122+  853A C5          >        push bc                     ; copy 3,2 to the screen memory
+122+  853B F5          >        push af                     ; copy 1,0 to the screen memory
+122+  853C             >            DoCopy i, 16  ; copy the remaining 16 attributes over to the row
+122+  853C             >        ; we move the stack pointer to our attribute buffer, with our offset row and columnStart
+122+  853C 31 35 81    >        ld sp, AttributeBuffer + (i * 32) + 16
+122+  853F             >        ; now we start popping the attributes off the 'stack'
+122+  853F F1          >        pop af                      ; 1,0
+122+  8540 C1          >        pop bc                      ; 3,2
+122+  8541 D1          >        pop de                      ; 5,4
+122+  8542 E1          >        pop hl                      ; 7,6
+122+  8543             >
+122+  8543             >        ; oops, we've run out of registers, so we need to swap to alternate registers
+122+  8543 08          >        ex af, af'                  ; swap af with af'
+122+  8544 D9          >        exx
+122+  8545             >
+122+  8545             >        ; carry on popping
+122+  8545 F1          >        pop af                      ; 9,8
+122+  8546 C1          >        pop bc                      ; 11,10
+122+  8547 D1          >        pop de                      ; 13,12
+122+  8548 E1          >        pop hl                      ; 15,14
+122+  8549             >
+122+  8549             >        ; we move the stack pointer to the attribute screen memory, with our offset row and columnStart
+122+  8549             >        ; as well as including the 16 bytes that we popped off the buffer stack and stored
+122+  8549 31 40 59    >        ld sp, $5800 + (i * 32) + 16 + 16
+122+  854C             >
+122+  854C             >        ; we push back onto the screen memory stack in reverse order
+122+  854C E5          >        push hl                     ; copy 15,14 to the screen memory
+122+  854D D5          >        push de                     ; copy 13,12 to the screen memory
+122+  854E C5          >        push bc                     ; copy 11,10 to the screen memory
+122+  854F F5          >        push af                     ; copy 9,8 to the screen memory
+122+  8550             >
+122+  8550             >        ; swap back to the original registers
+122+  8550 08          >        ex af, af'
+122+  8551 D9          >        exx
+122+  8552             >
+122+  8552 E5          >        push hl                     ; copy 7,6 to the screen memory
+122+  8553 D5          >        push de                     ; copy 5,4 to the screen memory
+122+  8554 C5          >        push bc                     ; copy 3,2 to the screen memory
+122+  8555 F5          >        push af                     ; copy 1,0 to the screen memory
+122+  8556             >            DoCopy i, 0   ; copy the first 16 attributes over to the row
+122+  8556             >        ; we move the stack pointer to our attribute buffer, with our offset row and columnStart
+122+  8556 31 45 81    >        ld sp, AttributeBuffer + (i * 32) + 0
+122+  8559             >        ; now we start popping the attributes off the 'stack'
+122+  8559 F1          >        pop af                      ; 1,0
+122+  855A C1          >        pop bc                      ; 3,2
+122+  855B D1          >        pop de                      ; 5,4
+122+  855C E1          >        pop hl                      ; 7,6
+122+  855D             >
+122+  855D             >        ; oops, we've run out of registers, so we need to swap to alternate registers
+122+  855D 08          >        ex af, af'                  ; swap af with af'
+122+  855E D9          >        exx
+122+  855F             >
+122+  855F             >        ; carry on popping
+122+  855F F1          >        pop af                      ; 9,8
+122+  8560 C1          >        pop bc                      ; 11,10
+122+  8561 D1          >        pop de                      ; 13,12
+122+  8562 E1          >        pop hl                      ; 15,14
+122+  8563             >
+122+  8563             >        ; we move the stack pointer to the attribute screen memory, with our offset row and columnStart
+122+  8563             >        ; as well as including the 16 bytes that we popped off the buffer stack and stored
+122+  8563 31 50 59    >        ld sp, $5800 + (i * 32) + 0 + 16
+122+  8566             >
+122+  8566             >        ; we push back onto the screen memory stack in reverse order
+122+  8566 E5          >        push hl                     ; copy 15,14 to the screen memory
+122+  8567 D5          >        push de                     ; copy 13,12 to the screen memory
+122+  8568 C5          >        push bc                     ; copy 11,10 to the screen memory
+122+  8569 F5          >        push af                     ; copy 9,8 to the screen memory
+122+  856A             >
+122+  856A             >        ; swap back to the original registers
+122+  856A 08          >        ex af, af'
+122+  856B D9          >        exx
+122+  856C             >
+122+  856C E5          >        push hl                     ; copy 7,6 to the screen memory
+122+  856D D5          >        push de                     ; copy 5,4 to the screen memory
+122+  856E C5          >        push bc                     ; copy 3,2 to the screen memory
+122+  856F F5          >        push af                     ; copy 1,0 to the screen memory
+122+  8570             >            DoCopy i, 16  ; copy the remaining 16 attributes over to the row
+122+  8570             >        ; we move the stack pointer to our attribute buffer, with our offset row and columnStart
+122+  8570 31 55 81    >        ld sp, AttributeBuffer + (i * 32) + 16
+122+  8573             >        ; now we start popping the attributes off the 'stack'
+122+  8573 F1          >        pop af                      ; 1,0
+122+  8574 C1          >        pop bc                      ; 3,2
+122+  8575 D1          >        pop de                      ; 5,4
+122+  8576 E1          >        pop hl                      ; 7,6
+122+  8577             >
+122+  8577             >        ; oops, we've run out of registers, so we need to swap to alternate registers
+122+  8577 08          >        ex af, af'                  ; swap af with af'
+122+  8578 D9          >        exx
+122+  8579             >
+122+  8579             >        ; carry on popping
+122+  8579 F1          >        pop af                      ; 9,8
+122+  857A C1          >        pop bc                      ; 11,10
+122+  857B D1          >        pop de                      ; 13,12
+122+  857C E1          >        pop hl                      ; 15,14
+122+  857D             >
+122+  857D             >        ; we move the stack pointer to the attribute screen memory, with our offset row and columnStart
+122+  857D             >        ; as well as including the 16 bytes that we popped off the buffer stack and stored
+122+  857D 31 60 59    >        ld sp, $5800 + (i * 32) + 16 + 16
+122+  8580             >
+122+  8580             >        ; we push back onto the screen memory stack in reverse order
+122+  8580 E5          >        push hl                     ; copy 15,14 to the screen memory
+122+  8581 D5          >        push de                     ; copy 13,12 to the screen memory
+122+  8582 C5          >        push bc                     ; copy 11,10 to the screen memory
+122+  8583 F5          >        push af                     ; copy 9,8 to the screen memory
+122+  8584             >
+122+  8584             >        ; swap back to the original registers
+122+  8584 08          >        ex af, af'
+122+  8585 D9          >        exx
+122+  8586             >
+122+  8586 E5          >        push hl                     ; copy 7,6 to the screen memory
+122+  8587 D5          >        push de                     ; copy 5,4 to the screen memory
+122+  8588 C5          >        push bc                     ; copy 3,2 to the screen memory
+122+  8589 F5          >        push af                     ; copy 1,0 to the screen memory
+122+  858A             >            DoCopy i, 0   ; copy the first 16 attributes over to the row
+122+  858A             >        ; we move the stack pointer to our attribute buffer, with our offset row and columnStart
+122+  858A 31 65 81    >        ld sp, AttributeBuffer + (i * 32) + 0
+122+  858D             >        ; now we start popping the attributes off the 'stack'
+122+  858D F1          >        pop af                      ; 1,0
+122+  858E C1          >        pop bc                      ; 3,2
+122+  858F D1          >        pop de                      ; 5,4
+122+  8590 E1          >        pop hl                      ; 7,6
+122+  8591             >
+122+  8591             >        ; oops, we've run out of registers, so we need to swap to alternate registers
+122+  8591 08          >        ex af, af'                  ; swap af with af'
+122+  8592 D9          >        exx
+122+  8593             >
+122+  8593             >        ; carry on popping
+122+  8593 F1          >        pop af                      ; 9,8
+122+  8594 C1          >        pop bc                      ; 11,10
+122+  8595 D1          >        pop de                      ; 13,12
+122+  8596 E1          >        pop hl                      ; 15,14
+122+  8597             >
+122+  8597             >        ; we move the stack pointer to the attribute screen memory, with our offset row and columnStart
+122+  8597             >        ; as well as including the 16 bytes that we popped off the buffer stack and stored
+122+  8597 31 70 59    >        ld sp, $5800 + (i * 32) + 0 + 16
+122+  859A             >
+122+  859A             >        ; we push back onto the screen memory stack in reverse order
+122+  859A E5          >        push hl                     ; copy 15,14 to the screen memory
+122+  859B D5          >        push de                     ; copy 13,12 to the screen memory
+122+  859C C5          >        push bc                     ; copy 11,10 to the screen memory
+122+  859D F5          >        push af                     ; copy 9,8 to the screen memory
+122+  859E             >
+122+  859E             >        ; swap back to the original registers
+122+  859E 08          >        ex af, af'
+122+  859F D9          >        exx
+122+  85A0             >
+122+  85A0 E5          >        push hl                     ; copy 7,6 to the screen memory
+122+  85A1 D5          >        push de                     ; copy 5,4 to the screen memory
+122+  85A2 C5          >        push bc                     ; copy 3,2 to the screen memory
+122+  85A3 F5          >        push af                     ; copy 1,0 to the screen memory
+122+  85A4             >            DoCopy i, 16  ; copy the remaining 16 attributes over to the row
+122+  85A4             >        ; we move the stack pointer to our attribute buffer, with our offset row and columnStart
+122+  85A4 31 75 81    >        ld sp, AttributeBuffer + (i * 32) + 16
+122+  85A7             >        ; now we start popping the attributes off the 'stack'
+122+  85A7 F1          >        pop af                      ; 1,0
+122+  85A8 C1          >        pop bc                      ; 3,2
+122+  85A9 D1          >        pop de                      ; 5,4
+122+  85AA E1          >        pop hl                      ; 7,6
+122+  85AB             >
+122+  85AB             >        ; oops, we've run out of registers, so we need to swap to alternate registers
+122+  85AB 08          >        ex af, af'                  ; swap af with af'
+122+  85AC D9          >        exx
+122+  85AD             >
+122+  85AD             >        ; carry on popping
+122+  85AD F1          >        pop af                      ; 9,8
+122+  85AE C1          >        pop bc                      ; 11,10
+122+  85AF D1          >        pop de                      ; 13,12
+122+  85B0 E1          >        pop hl                      ; 15,14
+122+  85B1             >
+122+  85B1             >        ; we move the stack pointer to the attribute screen memory, with our offset row and columnStart
+122+  85B1             >        ; as well as including the 16 bytes that we popped off the buffer stack and stored
+122+  85B1 31 80 59    >        ld sp, $5800 + (i * 32) + 16 + 16
+122+  85B4             >
+122+  85B4             >        ; we push back onto the screen memory stack in reverse order
+122+  85B4 E5          >        push hl                     ; copy 15,14 to the screen memory
+122+  85B5 D5          >        push de                     ; copy 13,12 to the screen memory
+122+  85B6 C5          >        push bc                     ; copy 11,10 to the screen memory
+122+  85B7 F5          >        push af                     ; copy 9,8 to the screen memory
+122+  85B8             >
+122+  85B8             >        ; swap back to the original registers
+122+  85B8 08          >        ex af, af'
+122+  85B9 D9          >        exx
+122+  85BA             >
+122+  85BA E5          >        push hl                     ; copy 7,6 to the screen memory
+122+  85BB D5          >        push de                     ; copy 5,4 to the screen memory
+122+  85BC C5          >        push bc                     ; copy 3,2 to the screen memory
+122+  85BD F5          >        push af                     ; copy 1,0 to the screen memory
+122+  85BE             >            DoCopy i, 0   ; copy the first 16 attributes over to the row
+122+  85BE             >        ; we move the stack pointer to our attribute buffer, with our offset row and columnStart
+122+  85BE 31 85 81    >        ld sp, AttributeBuffer + (i * 32) + 0
+122+  85C1             >        ; now we start popping the attributes off the 'stack'
+122+  85C1 F1          >        pop af                      ; 1,0
+122+  85C2 C1          >        pop bc                      ; 3,2
+122+  85C3 D1          >        pop de                      ; 5,4
+122+  85C4 E1          >        pop hl                      ; 7,6
+122+  85C5             >
+122+  85C5             >        ; oops, we've run out of registers, so we need to swap to alternate registers
+122+  85C5 08          >        ex af, af'                  ; swap af with af'
+122+  85C6 D9          >        exx
+122+  85C7             >
+122+  85C7             >        ; carry on popping
+122+  85C7 F1          >        pop af                      ; 9,8
+122+  85C8 C1          >        pop bc                      ; 11,10
+122+  85C9 D1          >        pop de                      ; 13,12
+122+  85CA E1          >        pop hl                      ; 15,14
+122+  85CB             >
+122+  85CB             >        ; we move the stack pointer to the attribute screen memory, with our offset row and columnStart
+122+  85CB             >        ; as well as including the 16 bytes that we popped off the buffer stack and stored
+122+  85CB 31 90 59    >        ld sp, $5800 + (i * 32) + 0 + 16
+122+  85CE             >
+122+  85CE             >        ; we push back onto the screen memory stack in reverse order
+122+  85CE E5          >        push hl                     ; copy 15,14 to the screen memory
+122+  85CF D5          >        push de                     ; copy 13,12 to the screen memory
+122+  85D0 C5          >        push bc                     ; copy 11,10 to the screen memory
+122+  85D1 F5          >        push af                     ; copy 9,8 to the screen memory
+122+  85D2             >
+122+  85D2             >        ; swap back to the original registers
+122+  85D2 08          >        ex af, af'
+122+  85D3 D9          >        exx
+122+  85D4             >
+122+  85D4 E5          >        push hl                     ; copy 7,6 to the screen memory
+122+  85D5 D5          >        push de                     ; copy 5,4 to the screen memory
+122+  85D6 C5          >        push bc                     ; copy 3,2 to the screen memory
+122+  85D7 F5          >        push af                     ; copy 1,0 to the screen memory
+122+  85D8             >            DoCopy i, 16  ; copy the remaining 16 attributes over to the row
+122+  85D8             >        ; we move the stack pointer to our attribute buffer, with our offset row and columnStart
+122+  85D8 31 95 81    >        ld sp, AttributeBuffer + (i * 32) + 16
+122+  85DB             >        ; now we start popping the attributes off the 'stack'
+122+  85DB F1          >        pop af                      ; 1,0
+122+  85DC C1          >        pop bc                      ; 3,2
+122+  85DD D1          >        pop de                      ; 5,4
+122+  85DE E1          >        pop hl                      ; 7,6
+122+  85DF             >
+122+  85DF             >        ; oops, we've run out of registers, so we need to swap to alternate registers
+122+  85DF 08          >        ex af, af'                  ; swap af with af'
+122+  85E0 D9          >        exx
+122+  85E1             >
+122+  85E1             >        ; carry on popping
+122+  85E1 F1          >        pop af                      ; 9,8
+122+  85E2 C1          >        pop bc                      ; 11,10
+122+  85E3 D1          >        pop de                      ; 13,12
+122+  85E4 E1          >        pop hl                      ; 15,14
+122+  85E5             >
+122+  85E5             >        ; we move the stack pointer to the attribute screen memory, with our offset row and columnStart
+122+  85E5             >        ; as well as including the 16 bytes that we popped off the buffer stack and stored
+122+  85E5 31 A0 59    >        ld sp, $5800 + (i * 32) + 16 + 16
+122+  85E8             >
+122+  85E8             >        ; we push back onto the screen memory stack in reverse order
+122+  85E8 E5          >        push hl                     ; copy 15,14 to the screen memory
+122+  85E9 D5          >        push de                     ; copy 13,12 to the screen memory
+122+  85EA C5          >        push bc                     ; copy 11,10 to the screen memory
+122+  85EB F5          >        push af                     ; copy 9,8 to the screen memory
+122+  85EC             >
+122+  85EC             >        ; swap back to the original registers
+122+  85EC 08          >        ex af, af'
+122+  85ED D9          >        exx
+122+  85EE             >
+122+  85EE E5          >        push hl                     ; copy 7,6 to the screen memory
+122+  85EF D5          >        push de                     ; copy 5,4 to the screen memory
+122+  85F0 C5          >        push bc                     ; copy 3,2 to the screen memory
+122+  85F1 F5          >        push af                     ; copy 1,0 to the screen memory
+122+  85F2             >            DoCopy i, 0   ; copy the first 16 attributes over to the row
+122+  85F2             >        ; we move the stack pointer to our attribute buffer, with our offset row and columnStart
+122+  85F2 31 A5 81    >        ld sp, AttributeBuffer + (i * 32) + 0
+122+  85F5             >        ; now we start popping the attributes off the 'stack'
+122+  85F5 F1          >        pop af                      ; 1,0
+122+  85F6 C1          >        pop bc                      ; 3,2
+122+  85F7 D1          >        pop de                      ; 5,4
+122+  85F8 E1          >        pop hl                      ; 7,6
+122+  85F9             >
+122+  85F9             >        ; oops, we've run out of registers, so we need to swap to alternate registers
+122+  85F9 08          >        ex af, af'                  ; swap af with af'
+122+  85FA D9          >        exx
+122+  85FB             >
+122+  85FB             >        ; carry on popping
+122+  85FB F1          >        pop af                      ; 9,8
+122+  85FC C1          >        pop bc                      ; 11,10
+122+  85FD D1          >        pop de                      ; 13,12
+122+  85FE E1          >        pop hl                      ; 15,14
+122+  85FF             >
+122+  85FF             >        ; we move the stack pointer to the attribute screen memory, with our offset row and columnStart
+122+  85FF             >        ; as well as including the 16 bytes that we popped off the buffer stack and stored
+122+  85FF 31 B0 59    >        ld sp, $5800 + (i * 32) + 0 + 16
+122+  8602             >
+122+  8602             >        ; we push back onto the screen memory stack in reverse order
+122+  8602 E5          >        push hl                     ; copy 15,14 to the screen memory
+122+  8603 D5          >        push de                     ; copy 13,12 to the screen memory
+122+  8604 C5          >        push bc                     ; copy 11,10 to the screen memory
+122+  8605 F5          >        push af                     ; copy 9,8 to the screen memory
+122+  8606             >
+122+  8606             >        ; swap back to the original registers
+122+  8606 08          >        ex af, af'
+122+  8607 D9          >        exx
+122+  8608             >
+122+  8608 E5          >        push hl                     ; copy 7,6 to the screen memory
+122+  8609 D5          >        push de                     ; copy 5,4 to the screen memory
+122+  860A C5          >        push bc                     ; copy 3,2 to the screen memory
+122+  860B F5          >        push af                     ; copy 1,0 to the screen memory
+122+  860C             >            DoCopy i, 16  ; copy the remaining 16 attributes over to the row
+122+  860C             >        ; we move the stack pointer to our attribute buffer, with our offset row and columnStart
+122+  860C 31 B5 81    >        ld sp, AttributeBuffer + (i * 32) + 16
+122+  860F             >        ; now we start popping the attributes off the 'stack'
+122+  860F F1          >        pop af                      ; 1,0
+122+  8610 C1          >        pop bc                      ; 3,2
+122+  8611 D1          >        pop de                      ; 5,4
+122+  8612 E1          >        pop hl                      ; 7,6
+122+  8613             >
+122+  8613             >        ; oops, we've run out of registers, so we need to swap to alternate registers
+122+  8613 08          >        ex af, af'                  ; swap af with af'
+122+  8614 D9          >        exx
+122+  8615             >
+122+  8615             >        ; carry on popping
+122+  8615 F1          >        pop af                      ; 9,8
+122+  8616 C1          >        pop bc                      ; 11,10
+122+  8617 D1          >        pop de                      ; 13,12
+122+  8618 E1          >        pop hl                      ; 15,14
+122+  8619             >
+122+  8619             >        ; we move the stack pointer to the attribute screen memory, with our offset row and columnStart
+122+  8619             >        ; as well as including the 16 bytes that we popped off the buffer stack and stored
+122+  8619 31 C0 59    >        ld sp, $5800 + (i * 32) + 16 + 16
+122+  861C             >
+122+  861C             >        ; we push back onto the screen memory stack in reverse order
+122+  861C E5          >        push hl                     ; copy 15,14 to the screen memory
+122+  861D D5          >        push de                     ; copy 13,12 to the screen memory
+122+  861E C5          >        push bc                     ; copy 11,10 to the screen memory
+122+  861F F5          >        push af                     ; copy 9,8 to the screen memory
+122+  8620             >
+122+  8620             >        ; swap back to the original registers
+122+  8620 08          >        ex af, af'
+122+  8621 D9          >        exx
+122+  8622             >
+122+  8622 E5          >        push hl                     ; copy 7,6 to the screen memory
+122+  8623 D5          >        push de                     ; copy 5,4 to the screen memory
+122+  8624 C5          >        push bc                     ; copy 3,2 to the screen memory
+122+  8625 F5          >        push af                     ; copy 1,0 to the screen memory
+122+  8626             >            DoCopy i, 0   ; copy the first 16 attributes over to the row
+122+  8626             >        ; we move the stack pointer to our attribute buffer, with our offset row and columnStart
+122+  8626 31 C5 81    >        ld sp, AttributeBuffer + (i * 32) + 0
+122+  8629             >        ; now we start popping the attributes off the 'stack'
+122+  8629 F1          >        pop af                      ; 1,0
+122+  862A C1          >        pop bc                      ; 3,2
+122+  862B D1          >        pop de                      ; 5,4
+122+  862C E1          >        pop hl                      ; 7,6
+122+  862D             >
+122+  862D             >        ; oops, we've run out of registers, so we need to swap to alternate registers
+122+  862D 08          >        ex af, af'                  ; swap af with af'
+122+  862E D9          >        exx
+122+  862F             >
+122+  862F             >        ; carry on popping
+122+  862F F1          >        pop af                      ; 9,8
+122+  8630 C1          >        pop bc                      ; 11,10
+122+  8631 D1          >        pop de                      ; 13,12
+122+  8632 E1          >        pop hl                      ; 15,14
+122+  8633             >
+122+  8633             >        ; we move the stack pointer to the attribute screen memory, with our offset row and columnStart
+122+  8633             >        ; as well as including the 16 bytes that we popped off the buffer stack and stored
+122+  8633 31 D0 59    >        ld sp, $5800 + (i * 32) + 0 + 16
+122+  8636             >
+122+  8636             >        ; we push back onto the screen memory stack in reverse order
+122+  8636 E5          >        push hl                     ; copy 15,14 to the screen memory
+122+  8637 D5          >        push de                     ; copy 13,12 to the screen memory
+122+  8638 C5          >        push bc                     ; copy 11,10 to the screen memory
+122+  8639 F5          >        push af                     ; copy 9,8 to the screen memory
+122+  863A             >
+122+  863A             >        ; swap back to the original registers
+122+  863A 08          >        ex af, af'
+122+  863B D9          >        exx
+122+  863C             >
+122+  863C E5          >        push hl                     ; copy 7,6 to the screen memory
+122+  863D D5          >        push de                     ; copy 5,4 to the screen memory
+122+  863E C5          >        push bc                     ; copy 3,2 to the screen memory
+122+  863F F5          >        push af                     ; copy 1,0 to the screen memory
+122+  8640             >            DoCopy i, 16  ; copy the remaining 16 attributes over to the row
+122+  8640             >        ; we move the stack pointer to our attribute buffer, with our offset row and columnStart
+122+  8640 31 D5 81    >        ld sp, AttributeBuffer + (i * 32) + 16
+122+  8643             >        ; now we start popping the attributes off the 'stack'
+122+  8643 F1          >        pop af                      ; 1,0
+122+  8644 C1          >        pop bc                      ; 3,2
+122+  8645 D1          >        pop de                      ; 5,4
+122+  8646 E1          >        pop hl                      ; 7,6
+122+  8647             >
+122+  8647             >        ; oops, we've run out of registers, so we need to swap to alternate registers
+122+  8647 08          >        ex af, af'                  ; swap af with af'
+122+  8648 D9          >        exx
+122+  8649             >
+122+  8649             >        ; carry on popping
+122+  8649 F1          >        pop af                      ; 9,8
+122+  864A C1          >        pop bc                      ; 11,10
+122+  864B D1          >        pop de                      ; 13,12
+122+  864C E1          >        pop hl                      ; 15,14
+122+  864D             >
+122+  864D             >        ; we move the stack pointer to the attribute screen memory, with our offset row and columnStart
+122+  864D             >        ; as well as including the 16 bytes that we popped off the buffer stack and stored
+122+  864D 31 E0 59    >        ld sp, $5800 + (i * 32) + 16 + 16
+122+  8650             >
+122+  8650             >        ; we push back onto the screen memory stack in reverse order
+122+  8650 E5          >        push hl                     ; copy 15,14 to the screen memory
+122+  8651 D5          >        push de                     ; copy 13,12 to the screen memory
+122+  8652 C5          >        push bc                     ; copy 11,10 to the screen memory
+122+  8653 F5          >        push af                     ; copy 9,8 to the screen memory
+122+  8654             >
+122+  8654             >        ; swap back to the original registers
+122+  8654 08          >        ex af, af'
+122+  8655 D9          >        exx
+122+  8656             >
+122+  8656 E5          >        push hl                     ; copy 7,6 to the screen memory
+122+  8657 D5          >        push de                     ; copy 5,4 to the screen memory
+122+  8658 C5          >        push bc                     ; copy 3,2 to the screen memory
+122+  8659 F5          >        push af                     ; copy 1,0 to the screen memory
+122+  865A             >            DoCopy i, 0   ; copy the first 16 attributes over to the row
+122+  865A             >        ; we move the stack pointer to our attribute buffer, with our offset row and columnStart
+122+  865A 31 E5 81    >        ld sp, AttributeBuffer + (i * 32) + 0
+122+  865D             >        ; now we start popping the attributes off the 'stack'
+122+  865D F1          >        pop af                      ; 1,0
+122+  865E C1          >        pop bc                      ; 3,2
+122+  865F D1          >        pop de                      ; 5,4
+122+  8660 E1          >        pop hl                      ; 7,6
+122+  8661             >
+122+  8661             >        ; oops, we've run out of registers, so we need to swap to alternate registers
+122+  8661 08          >        ex af, af'                  ; swap af with af'
+122+  8662 D9          >        exx
+122+  8663             >
+122+  8663             >        ; carry on popping
+122+  8663 F1          >        pop af                      ; 9,8
+122+  8664 C1          >        pop bc                      ; 11,10
+122+  8665 D1          >        pop de                      ; 13,12
+122+  8666 E1          >        pop hl                      ; 15,14
+122+  8667             >
+122+  8667             >        ; we move the stack pointer to the attribute screen memory, with our offset row and columnStart
+122+  8667             >        ; as well as including the 16 bytes that we popped off the buffer stack and stored
+122+  8667 31 F0 59    >        ld sp, $5800 + (i * 32) + 0 + 16
+122+  866A             >
+122+  866A             >        ; we push back onto the screen memory stack in reverse order
+122+  866A E5          >        push hl                     ; copy 15,14 to the screen memory
+122+  866B D5          >        push de                     ; copy 13,12 to the screen memory
+122+  866C C5          >        push bc                     ; copy 11,10 to the screen memory
+122+  866D F5          >        push af                     ; copy 9,8 to the screen memory
+122+  866E             >
+122+  866E             >        ; swap back to the original registers
+122+  866E 08          >        ex af, af'
+122+  866F D9          >        exx
+122+  8670             >
+122+  8670 E5          >        push hl                     ; copy 7,6 to the screen memory
+122+  8671 D5          >        push de                     ; copy 5,4 to the screen memory
+122+  8672 C5          >        push bc                     ; copy 3,2 to the screen memory
+122+  8673 F5          >        push af                     ; copy 1,0 to the screen memory
+122+  8674             >            DoCopy i, 16  ; copy the remaining 16 attributes over to the row
+122+  8674             >        ; we move the stack pointer to our attribute buffer, with our offset row and columnStart
+122+  8674 31 F5 81    >        ld sp, AttributeBuffer + (i * 32) + 16
+122+  8677             >        ; now we start popping the attributes off the 'stack'
+122+  8677 F1          >        pop af                      ; 1,0
+122+  8678 C1          >        pop bc                      ; 3,2
+122+  8679 D1          >        pop de                      ; 5,4
+122+  867A E1          >        pop hl                      ; 7,6
+122+  867B             >
+122+  867B             >        ; oops, we've run out of registers, so we need to swap to alternate registers
+122+  867B 08          >        ex af, af'                  ; swap af with af'
+122+  867C D9          >        exx
+122+  867D             >
+122+  867D             >        ; carry on popping
+122+  867D F1          >        pop af                      ; 9,8
+122+  867E C1          >        pop bc                      ; 11,10
+122+  867F D1          >        pop de                      ; 13,12
+122+  8680 E1          >        pop hl                      ; 15,14
+122+  8681             >
+122+  8681             >        ; we move the stack pointer to the attribute screen memory, with our offset row and columnStart
+122+  8681             >        ; as well as including the 16 bytes that we popped off the buffer stack and stored
+122+  8681 31 00 5A    >        ld sp, $5800 + (i * 32) + 16 + 16
+122+  8684             >
+122+  8684             >        ; we push back onto the screen memory stack in reverse order
+122+  8684 E5          >        push hl                     ; copy 15,14 to the screen memory
+122+  8685 D5          >        push de                     ; copy 13,12 to the screen memory
+122+  8686 C5          >        push bc                     ; copy 11,10 to the screen memory
+122+  8687 F5          >        push af                     ; copy 9,8 to the screen memory
+122+  8688             >
+122+  8688             >        ; swap back to the original registers
+122+  8688 08          >        ex af, af'
+122+  8689 D9          >        exx
+122+  868A             >
+122+  868A E5          >        push hl                     ; copy 7,6 to the screen memory
+122+  868B D5          >        push de                     ; copy 5,4 to the screen memory
+122+  868C C5          >        push bc                     ; copy 3,2 to the screen memory
+122+  868D F5          >        push af                     ; copy 1,0 to the screen memory
+122+  868E             >            DoCopy i, 0   ; copy the first 16 attributes over to the row
+122+  868E             >        ; we move the stack pointer to our attribute buffer, with our offset row and columnStart
+122+  868E 31 05 82    >        ld sp, AttributeBuffer + (i * 32) + 0
+122+  8691             >        ; now we start popping the attributes off the 'stack'
+122+  8691 F1          >        pop af                      ; 1,0
+122+  8692 C1          >        pop bc                      ; 3,2
+122+  8693 D1          >        pop de                      ; 5,4
+122+  8694 E1          >        pop hl                      ; 7,6
+122+  8695             >
+122+  8695             >        ; oops, we've run out of registers, so we need to swap to alternate registers
+122+  8695 08          >        ex af, af'                  ; swap af with af'
+122+  8696 D9          >        exx
+122+  8697             >
+122+  8697             >        ; carry on popping
+122+  8697 F1          >        pop af                      ; 9,8
+122+  8698 C1          >        pop bc                      ; 11,10
+122+  8699 D1          >        pop de                      ; 13,12
+122+  869A E1          >        pop hl                      ; 15,14
+122+  869B             >
+122+  869B             >        ; we move the stack pointer to the attribute screen memory, with our offset row and columnStart
+122+  869B             >        ; as well as including the 16 bytes that we popped off the buffer stack and stored
+122+  869B 31 10 5A    >        ld sp, $5800 + (i * 32) + 0 + 16
+122+  869E             >
+122+  869E             >        ; we push back onto the screen memory stack in reverse order
+122+  869E E5          >        push hl                     ; copy 15,14 to the screen memory
+122+  869F D5          >        push de                     ; copy 13,12 to the screen memory
+122+  86A0 C5          >        push bc                     ; copy 11,10 to the screen memory
+122+  86A1 F5          >        push af                     ; copy 9,8 to the screen memory
+122+  86A2             >
+122+  86A2             >        ; swap back to the original registers
+122+  86A2 08          >        ex af, af'
+122+  86A3 D9          >        exx
+122+  86A4             >
+122+  86A4 E5          >        push hl                     ; copy 7,6 to the screen memory
+122+  86A5 D5          >        push de                     ; copy 5,4 to the screen memory
+122+  86A6 C5          >        push bc                     ; copy 3,2 to the screen memory
+122+  86A7 F5          >        push af                     ; copy 1,0 to the screen memory
+122+  86A8             >            DoCopy i, 16  ; copy the remaining 16 attributes over to the row
+122+  86A8             >        ; we move the stack pointer to our attribute buffer, with our offset row and columnStart
+122+  86A8 31 15 82    >        ld sp, AttributeBuffer + (i * 32) + 16
+122+  86AB             >        ; now we start popping the attributes off the 'stack'
+122+  86AB F1          >        pop af                      ; 1,0
+122+  86AC C1          >        pop bc                      ; 3,2
+122+  86AD D1          >        pop de                      ; 5,4
+122+  86AE E1          >        pop hl                      ; 7,6
+122+  86AF             >
+122+  86AF             >        ; oops, we've run out of registers, so we need to swap to alternate registers
+122+  86AF 08          >        ex af, af'                  ; swap af with af'
+122+  86B0 D9          >        exx
+122+  86B1             >
+122+  86B1             >        ; carry on popping
+122+  86B1 F1          >        pop af                      ; 9,8
+122+  86B2 C1          >        pop bc                      ; 11,10
+122+  86B3 D1          >        pop de                      ; 13,12
+122+  86B4 E1          >        pop hl                      ; 15,14
+122+  86B5             >
+122+  86B5             >        ; we move the stack pointer to the attribute screen memory, with our offset row and columnStart
+122+  86B5             >        ; as well as including the 16 bytes that we popped off the buffer stack and stored
+122+  86B5 31 20 5A    >        ld sp, $5800 + (i * 32) + 16 + 16
+122+  86B8             >
+122+  86B8             >        ; we push back onto the screen memory stack in reverse order
+122+  86B8 E5          >        push hl                     ; copy 15,14 to the screen memory
+122+  86B9 D5          >        push de                     ; copy 13,12 to the screen memory
+122+  86BA C5          >        push bc                     ; copy 11,10 to the screen memory
+122+  86BB F5          >        push af                     ; copy 9,8 to the screen memory
+122+  86BC             >
+122+  86BC             >        ; swap back to the original registers
+122+  86BC 08          >        ex af, af'
+122+  86BD D9          >        exx
+122+  86BE             >
+122+  86BE E5          >        push hl                     ; copy 7,6 to the screen memory
+122+  86BF D5          >        push de                     ; copy 5,4 to the screen memory
+122+  86C0 C5          >        push bc                     ; copy 3,2 to the screen memory
+122+  86C1 F5          >        push af                     ; copy 1,0 to the screen memory
+122+  86C2             >            DoCopy i, 0   ; copy the first 16 attributes over to the row
+122+  86C2             >        ; we move the stack pointer to our attribute buffer, with our offset row and columnStart
+122+  86C2 31 25 82    >        ld sp, AttributeBuffer + (i * 32) + 0
+122+  86C5             >        ; now we start popping the attributes off the 'stack'
+122+  86C5 F1          >        pop af                      ; 1,0
+122+  86C6 C1          >        pop bc                      ; 3,2
+122+  86C7 D1          >        pop de                      ; 5,4
+122+  86C8 E1          >        pop hl                      ; 7,6
+122+  86C9             >
+122+  86C9             >        ; oops, we've run out of registers, so we need to swap to alternate registers
+122+  86C9 08          >        ex af, af'                  ; swap af with af'
+122+  86CA D9          >        exx
+122+  86CB             >
+122+  86CB             >        ; carry on popping
+122+  86CB F1          >        pop af                      ; 9,8
+122+  86CC C1          >        pop bc                      ; 11,10
+122+  86CD D1          >        pop de                      ; 13,12
+122+  86CE E1          >        pop hl                      ; 15,14
+122+  86CF             >
+122+  86CF             >        ; we move the stack pointer to the attribute screen memory, with our offset row and columnStart
+122+  86CF             >        ; as well as including the 16 bytes that we popped off the buffer stack and stored
+122+  86CF 31 30 5A    >        ld sp, $5800 + (i * 32) + 0 + 16
+122+  86D2             >
+122+  86D2             >        ; we push back onto the screen memory stack in reverse order
+122+  86D2 E5          >        push hl                     ; copy 15,14 to the screen memory
+122+  86D3 D5          >        push de                     ; copy 13,12 to the screen memory
+122+  86D4 C5          >        push bc                     ; copy 11,10 to the screen memory
+122+  86D5 F5          >        push af                     ; copy 9,8 to the screen memory
+122+  86D6             >
+122+  86D6             >        ; swap back to the original registers
+122+  86D6 08          >        ex af, af'
+122+  86D7 D9          >        exx
+122+  86D8             >
+122+  86D8 E5          >        push hl                     ; copy 7,6 to the screen memory
+122+  86D9 D5          >        push de                     ; copy 5,4 to the screen memory
+122+  86DA C5          >        push bc                     ; copy 3,2 to the screen memory
+122+  86DB F5          >        push af                     ; copy 1,0 to the screen memory
+122+  86DC             >            DoCopy i, 16  ; copy the remaining 16 attributes over to the row
+122+  86DC             >        ; we move the stack pointer to our attribute buffer, with our offset row and columnStart
+122+  86DC 31 35 82    >        ld sp, AttributeBuffer + (i * 32) + 16
+122+  86DF             >        ; now we start popping the attributes off the 'stack'
+122+  86DF F1          >        pop af                      ; 1,0
+122+  86E0 C1          >        pop bc                      ; 3,2
+122+  86E1 D1          >        pop de                      ; 5,4
+122+  86E2 E1          >        pop hl                      ; 7,6
+122+  86E3             >
+122+  86E3             >        ; oops, we've run out of registers, so we need to swap to alternate registers
+122+  86E3 08          >        ex af, af'                  ; swap af with af'
+122+  86E4 D9          >        exx
+122+  86E5             >
+122+  86E5             >        ; carry on popping
+122+  86E5 F1          >        pop af                      ; 9,8
+122+  86E6 C1          >        pop bc                      ; 11,10
+122+  86E7 D1          >        pop de                      ; 13,12
+122+  86E8 E1          >        pop hl                      ; 15,14
+122+  86E9             >
+122+  86E9             >        ; we move the stack pointer to the attribute screen memory, with our offset row and columnStart
+122+  86E9             >        ; as well as including the 16 bytes that we popped off the buffer stack and stored
+122+  86E9 31 40 5A    >        ld sp, $5800 + (i * 32) + 16 + 16
+122+  86EC             >
+122+  86EC             >        ; we push back onto the screen memory stack in reverse order
+122+  86EC E5          >        push hl                     ; copy 15,14 to the screen memory
+122+  86ED D5          >        push de                     ; copy 13,12 to the screen memory
+122+  86EE C5          >        push bc                     ; copy 11,10 to the screen memory
+122+  86EF F5          >        push af                     ; copy 9,8 to the screen memory
+122+  86F0             >
+122+  86F0             >        ; swap back to the original registers
+122+  86F0 08          >        ex af, af'
+122+  86F1 D9          >        exx
+122+  86F2             >
+122+  86F2 E5          >        push hl                     ; copy 7,6 to the screen memory
+122+  86F3 D5          >        push de                     ; copy 5,4 to the screen memory
+122+  86F4 C5          >        push bc                     ; copy 3,2 to the screen memory
+122+  86F5 F5          >        push af                     ; copy 1,0 to the screen memory
+122+  86F6             >            DoCopy i, 0   ; copy the first 16 attributes over to the row
+122+  86F6             >        ; we move the stack pointer to our attribute buffer, with our offset row and columnStart
+122+  86F6 31 45 82    >        ld sp, AttributeBuffer + (i * 32) + 0
+122+  86F9             >        ; now we start popping the attributes off the 'stack'
+122+  86F9 F1          >        pop af                      ; 1,0
+122+  86FA C1          >        pop bc                      ; 3,2
+122+  86FB D1          >        pop de                      ; 5,4
+122+  86FC E1          >        pop hl                      ; 7,6
+122+  86FD             >
+122+  86FD             >        ; oops, we've run out of registers, so we need to swap to alternate registers
+122+  86FD 08          >        ex af, af'                  ; swap af with af'
+122+  86FE D9          >        exx
+122+  86FF             >
+122+  86FF             >        ; carry on popping
+122+  86FF F1          >        pop af                      ; 9,8
+122+  8700 C1          >        pop bc                      ; 11,10
+122+  8701 D1          >        pop de                      ; 13,12
+122+  8702 E1          >        pop hl                      ; 15,14
+122+  8703             >
+122+  8703             >        ; we move the stack pointer to the attribute screen memory, with our offset row and columnStart
+122+  8703             >        ; as well as including the 16 bytes that we popped off the buffer stack and stored
+122+  8703 31 50 5A    >        ld sp, $5800 + (i * 32) + 0 + 16
+122+  8706             >
+122+  8706             >        ; we push back onto the screen memory stack in reverse order
+122+  8706 E5          >        push hl                     ; copy 15,14 to the screen memory
+122+  8707 D5          >        push de                     ; copy 13,12 to the screen memory
+122+  8708 C5          >        push bc                     ; copy 11,10 to the screen memory
+122+  8709 F5          >        push af                     ; copy 9,8 to the screen memory
+122+  870A             >
+122+  870A             >        ; swap back to the original registers
+122+  870A 08          >        ex af, af'
+122+  870B D9          >        exx
+122+  870C             >
+122+  870C E5          >        push hl                     ; copy 7,6 to the screen memory
+122+  870D D5          >        push de                     ; copy 5,4 to the screen memory
+122+  870E C5          >        push bc                     ; copy 3,2 to the screen memory
+122+  870F F5          >        push af                     ; copy 1,0 to the screen memory
+122+  8710             >            DoCopy i, 16  ; copy the remaining 16 attributes over to the row
+122+  8710             >        ; we move the stack pointer to our attribute buffer, with our offset row and columnStart
+122+  8710 31 55 82    >        ld sp, AttributeBuffer + (i * 32) + 16
+122+  8713             >        ; now we start popping the attributes off the 'stack'
+122+  8713 F1          >        pop af                      ; 1,0
+122+  8714 C1          >        pop bc                      ; 3,2
+122+  8715 D1          >        pop de                      ; 5,4
+122+  8716 E1          >        pop hl                      ; 7,6
+122+  8717             >
+122+  8717             >        ; oops, we've run out of registers, so we need to swap to alternate registers
+122+  8717 08          >        ex af, af'                  ; swap af with af'
+122+  8718 D9          >        exx
+122+  8719             >
+122+  8719             >        ; carry on popping
+122+  8719 F1          >        pop af                      ; 9,8
+122+  871A C1          >        pop bc                      ; 11,10
+122+  871B D1          >        pop de                      ; 13,12
+122+  871C E1          >        pop hl                      ; 15,14
+122+  871D             >
+122+  871D             >        ; we move the stack pointer to the attribute screen memory, with our offset row and columnStart
+122+  871D             >        ; as well as including the 16 bytes that we popped off the buffer stack and stored
+122+  871D 31 60 5A    >        ld sp, $5800 + (i * 32) + 16 + 16
+122+  8720             >
+122+  8720             >        ; we push back onto the screen memory stack in reverse order
+122+  8720 E5          >        push hl                     ; copy 15,14 to the screen memory
+122+  8721 D5          >        push de                     ; copy 13,12 to the screen memory
+122+  8722 C5          >        push bc                     ; copy 11,10 to the screen memory
+122+  8723 F5          >        push af                     ; copy 9,8 to the screen memory
+122+  8724             >
+122+  8724             >        ; swap back to the original registers
+122+  8724 08          >        ex af, af'
+122+  8725 D9          >        exx
+122+  8726             >
+122+  8726 E5          >        push hl                     ; copy 7,6 to the screen memory
+122+  8727 D5          >        push de                     ; copy 5,4 to the screen memory
+122+  8728 C5          >        push bc                     ; copy 3,2 to the screen memory
+122+  8729 F5          >        push af                     ; copy 1,0 to the screen memory
+122+  872A             >            DoCopy i, 0   ; copy the first 16 attributes over to the row
+122+  872A             >        ; we move the stack pointer to our attribute buffer, with our offset row and columnStart
+122+  872A 31 65 82    >        ld sp, AttributeBuffer + (i * 32) + 0
+122+  872D             >        ; now we start popping the attributes off the 'stack'
+122+  872D F1          >        pop af                      ; 1,0
+122+  872E C1          >        pop bc                      ; 3,2
+122+  872F D1          >        pop de                      ; 5,4
+122+  8730 E1          >        pop hl                      ; 7,6
+122+  8731             >
+122+  8731             >        ; oops, we've run out of registers, so we need to swap to alternate registers
+122+  8731 08          >        ex af, af'                  ; swap af with af'
+122+  8732 D9          >        exx
+122+  8733             >
+122+  8733             >        ; carry on popping
+122+  8733 F1          >        pop af                      ; 9,8
+122+  8734 C1          >        pop bc                      ; 11,10
+122+  8735 D1          >        pop de                      ; 13,12
+122+  8736 E1          >        pop hl                      ; 15,14
+122+  8737             >
+122+  8737             >        ; we move the stack pointer to the attribute screen memory, with our offset row and columnStart
+122+  8737             >        ; as well as including the 16 bytes that we popped off the buffer stack and stored
+122+  8737 31 70 5A    >        ld sp, $5800 + (i * 32) + 0 + 16
+122+  873A             >
+122+  873A             >        ; we push back onto the screen memory stack in reverse order
+122+  873A E5          >        push hl                     ; copy 15,14 to the screen memory
+122+  873B D5          >        push de                     ; copy 13,12 to the screen memory
+122+  873C C5          >        push bc                     ; copy 11,10 to the screen memory
+122+  873D F5          >        push af                     ; copy 9,8 to the screen memory
+122+  873E             >
+122+  873E             >        ; swap back to the original registers
+122+  873E 08          >        ex af, af'
+122+  873F D9          >        exx
+122+  8740             >
+122+  8740 E5          >        push hl                     ; copy 7,6 to the screen memory
+122+  8741 D5          >        push de                     ; copy 5,4 to the screen memory
+122+  8742 C5          >        push bc                     ; copy 3,2 to the screen memory
+122+  8743 F5          >        push af                     ; copy 1,0 to the screen memory
+122+  8744             >            DoCopy i, 16  ; copy the remaining 16 attributes over to the row
+122+  8744             >        ; we move the stack pointer to our attribute buffer, with our offset row and columnStart
+122+  8744 31 75 82    >        ld sp, AttributeBuffer + (i * 32) + 16
+122+  8747             >        ; now we start popping the attributes off the 'stack'
+122+  8747 F1          >        pop af                      ; 1,0
+122+  8748 C1          >        pop bc                      ; 3,2
+122+  8749 D1          >        pop de                      ; 5,4
+122+  874A E1          >        pop hl                      ; 7,6
+122+  874B             >
+122+  874B             >        ; oops, we've run out of registers, so we need to swap to alternate registers
+122+  874B 08          >        ex af, af'                  ; swap af with af'
+122+  874C D9          >        exx
+122+  874D             >
+122+  874D             >        ; carry on popping
+122+  874D F1          >        pop af                      ; 9,8
+122+  874E C1          >        pop bc                      ; 11,10
+122+  874F D1          >        pop de                      ; 13,12
+122+  8750 E1          >        pop hl                      ; 15,14
+122+  8751             >
+122+  8751             >        ; we move the stack pointer to the attribute screen memory, with our offset row and columnStart
+122+  8751             >        ; as well as including the 16 bytes that we popped off the buffer stack and stored
+122+  8751 31 80 5A    >        ld sp, $5800 + (i * 32) + 16 + 16
+122+  8754             >
+122+  8754             >        ; we push back onto the screen memory stack in reverse order
+122+  8754 E5          >        push hl                     ; copy 15,14 to the screen memory
+122+  8755 D5          >        push de                     ; copy 13,12 to the screen memory
+122+  8756 C5          >        push bc                     ; copy 11,10 to the screen memory
+122+  8757 F5          >        push af                     ; copy 9,8 to the screen memory
+122+  8758             >
+122+  8758             >        ; swap back to the original registers
+122+  8758 08          >        ex af, af'
+122+  8759 D9          >        exx
+122+  875A             >
+122+  875A E5          >        push hl                     ; copy 7,6 to the screen memory
+122+  875B D5          >        push de                     ; copy 5,4 to the screen memory
+122+  875C C5          >        push bc                     ; copy 3,2 to the screen memory
+122+  875D F5          >        push af                     ; copy 1,0 to the screen memory
+122+  875E             >            DoCopy i, 0   ; copy the first 16 attributes over to the row
+122+  875E             >        ; we move the stack pointer to our attribute buffer, with our offset row and columnStart
+122+  875E 31 85 82    >        ld sp, AttributeBuffer + (i * 32) + 0
+122+  8761             >        ; now we start popping the attributes off the 'stack'
+122+  8761 F1          >        pop af                      ; 1,0
+122+  8762 C1          >        pop bc                      ; 3,2
+122+  8763 D1          >        pop de                      ; 5,4
+122+  8764 E1          >        pop hl                      ; 7,6
+122+  8765             >
+122+  8765             >        ; oops, we've run out of registers, so we need to swap to alternate registers
+122+  8765 08          >        ex af, af'                  ; swap af with af'
+122+  8766 D9          >        exx
+122+  8767             >
+122+  8767             >        ; carry on popping
+122+  8767 F1          >        pop af                      ; 9,8
+122+  8768 C1          >        pop bc                      ; 11,10
+122+  8769 D1          >        pop de                      ; 13,12
+122+  876A E1          >        pop hl                      ; 15,14
+122+  876B             >
+122+  876B             >        ; we move the stack pointer to the attribute screen memory, with our offset row and columnStart
+122+  876B             >        ; as well as including the 16 bytes that we popped off the buffer stack and stored
+122+  876B 31 90 5A    >        ld sp, $5800 + (i * 32) + 0 + 16
+122+  876E             >
+122+  876E             >        ; we push back onto the screen memory stack in reverse order
+122+  876E E5          >        push hl                     ; copy 15,14 to the screen memory
+122+  876F D5          >        push de                     ; copy 13,12 to the screen memory
+122+  8770 C5          >        push bc                     ; copy 11,10 to the screen memory
+122+  8771 F5          >        push af                     ; copy 9,8 to the screen memory
+122+  8772             >
+122+  8772             >        ; swap back to the original registers
+122+  8772 08          >        ex af, af'
+122+  8773 D9          >        exx
+122+  8774             >
+122+  8774 E5          >        push hl                     ; copy 7,6 to the screen memory
+122+  8775 D5          >        push de                     ; copy 5,4 to the screen memory
+122+  8776 C5          >        push bc                     ; copy 3,2 to the screen memory
+122+  8777 F5          >        push af                     ; copy 1,0 to the screen memory
+122+  8778             >            DoCopy i, 16  ; copy the remaining 16 attributes over to the row
+122+  8778             >        ; we move the stack pointer to our attribute buffer, with our offset row and columnStart
+122+  8778 31 95 82    >        ld sp, AttributeBuffer + (i * 32) + 16
+122+  877B             >        ; now we start popping the attributes off the 'stack'
+122+  877B F1          >        pop af                      ; 1,0
+122+  877C C1          >        pop bc                      ; 3,2
+122+  877D D1          >        pop de                      ; 5,4
+122+  877E E1          >        pop hl                      ; 7,6
+122+  877F             >
+122+  877F             >        ; oops, we've run out of registers, so we need to swap to alternate registers
+122+  877F 08          >        ex af, af'                  ; swap af with af'
+122+  8780 D9          >        exx
+122+  8781             >
+122+  8781             >        ; carry on popping
+122+  8781 F1          >        pop af                      ; 9,8
+122+  8782 C1          >        pop bc                      ; 11,10
+122+  8783 D1          >        pop de                      ; 13,12
+122+  8784 E1          >        pop hl                      ; 15,14
+122+  8785             >
+122+  8785             >        ; we move the stack pointer to the attribute screen memory, with our offset row and columnStart
+122+  8785             >        ; as well as including the 16 bytes that we popped off the buffer stack and stored
+122+  8785 31 A0 5A    >        ld sp, $5800 + (i * 32) + 16 + 16
+122+  8788             >
+122+  8788             >        ; we push back onto the screen memory stack in reverse order
+122+  8788 E5          >        push hl                     ; copy 15,14 to the screen memory
+122+  8789 D5          >        push de                     ; copy 13,12 to the screen memory
+122+  878A C5          >        push bc                     ; copy 11,10 to the screen memory
+122+  878B F5          >        push af                     ; copy 9,8 to the screen memory
+122+  878C             >
+122+  878C             >        ; swap back to the original registers
+122+  878C 08          >        ex af, af'
+122+  878D D9          >        exx
+122+  878E             >
+122+  878E E5          >        push hl                     ; copy 7,6 to the screen memory
+122+  878F D5          >        push de                     ; copy 5,4 to the screen memory
+122+  8790 C5          >        push bc                     ; copy 3,2 to the screen memory
+122+  8791 F5          >        push af                     ; copy 1,0 to the screen memory
+122+  8792             >            DoCopy i, 0   ; copy the first 16 attributes over to the row
+122+  8792             >        ; we move the stack pointer to our attribute buffer, with our offset row and columnStart
+122+  8792 31 A5 82    >        ld sp, AttributeBuffer + (i * 32) + 0
+122+  8795             >        ; now we start popping the attributes off the 'stack'
+122+  8795 F1          >        pop af                      ; 1,0
+122+  8796 C1          >        pop bc                      ; 3,2
+122+  8797 D1          >        pop de                      ; 5,4
+122+  8798 E1          >        pop hl                      ; 7,6
+122+  8799             >
+122+  8799             >        ; oops, we've run out of registers, so we need to swap to alternate registers
+122+  8799 08          >        ex af, af'                  ; swap af with af'
+122+  879A D9          >        exx
+122+  879B             >
+122+  879B             >        ; carry on popping
+122+  879B F1          >        pop af                      ; 9,8
+122+  879C C1          >        pop bc                      ; 11,10
+122+  879D D1          >        pop de                      ; 13,12
+122+  879E E1          >        pop hl                      ; 15,14
+122+  879F             >
+122+  879F             >        ; we move the stack pointer to the attribute screen memory, with our offset row and columnStart
+122+  879F             >        ; as well as including the 16 bytes that we popped off the buffer stack and stored
+122+  879F 31 B0 5A    >        ld sp, $5800 + (i * 32) + 0 + 16
+122+  87A2             >
+122+  87A2             >        ; we push back onto the screen memory stack in reverse order
+122+  87A2 E5          >        push hl                     ; copy 15,14 to the screen memory
+122+  87A3 D5          >        push de                     ; copy 13,12 to the screen memory
+122+  87A4 C5          >        push bc                     ; copy 11,10 to the screen memory
+122+  87A5 F5          >        push af                     ; copy 9,8 to the screen memory
+122+  87A6             >
+122+  87A6             >        ; swap back to the original registers
+122+  87A6 08          >        ex af, af'
+122+  87A7 D9          >        exx
+122+  87A8             >
+122+  87A8 E5          >        push hl                     ; copy 7,6 to the screen memory
+122+  87A9 D5          >        push de                     ; copy 5,4 to the screen memory
+122+  87AA C5          >        push bc                     ; copy 3,2 to the screen memory
+122+  87AB F5          >        push af                     ; copy 1,0 to the screen memory
+122+  87AC             >            DoCopy i, 16  ; copy the remaining 16 attributes over to the row
+122+  87AC             >        ; we move the stack pointer to our attribute buffer, with our offset row and columnStart
+122+  87AC 31 B5 82    >        ld sp, AttributeBuffer + (i * 32) + 16
+122+  87AF             >        ; now we start popping the attributes off the 'stack'
+122+  87AF F1          >        pop af                      ; 1,0
+122+  87B0 C1          >        pop bc                      ; 3,2
+122+  87B1 D1          >        pop de                      ; 5,4
+122+  87B2 E1          >        pop hl                      ; 7,6
+122+  87B3             >
+122+  87B3             >        ; oops, we've run out of registers, so we need to swap to alternate registers
+122+  87B3 08          >        ex af, af'                  ; swap af with af'
+122+  87B4 D9          >        exx
+122+  87B5             >
+122+  87B5             >        ; carry on popping
+122+  87B5 F1          >        pop af                      ; 9,8
+122+  87B6 C1          >        pop bc                      ; 11,10
+122+  87B7 D1          >        pop de                      ; 13,12
+122+  87B8 E1          >        pop hl                      ; 15,14
+122+  87B9             >
+122+  87B9             >        ; we move the stack pointer to the attribute screen memory, with our offset row and columnStart
+122+  87B9             >        ; as well as including the 16 bytes that we popped off the buffer stack and stored
+122+  87B9 31 C0 5A    >        ld sp, $5800 + (i * 32) + 16 + 16
+122+  87BC             >
+122+  87BC             >        ; we push back onto the screen memory stack in reverse order
+122+  87BC E5          >        push hl                     ; copy 15,14 to the screen memory
+122+  87BD D5          >        push de                     ; copy 13,12 to the screen memory
+122+  87BE C5          >        push bc                     ; copy 11,10 to the screen memory
+122+  87BF F5          >        push af                     ; copy 9,8 to the screen memory
+122+  87C0             >
+122+  87C0             >        ; swap back to the original registers
+122+  87C0 08          >        ex af, af'
+122+  87C1 D9          >        exx
+122+  87C2             >
+122+  87C2 E5          >        push hl                     ; copy 7,6 to the screen memory
+122+  87C3 D5          >        push de                     ; copy 5,4 to the screen memory
+122+  87C4 C5          >        push bc                     ; copy 3,2 to the screen memory
+122+  87C5 F5          >        push af                     ; copy 1,0 to the screen memory
+122+  87C6             >            DoCopy i, 0   ; copy the first 16 attributes over to the row
+122+  87C6             >        ; we move the stack pointer to our attribute buffer, with our offset row and columnStart
+122+  87C6 31 C5 82    >        ld sp, AttributeBuffer + (i * 32) + 0
+122+  87C9             >        ; now we start popping the attributes off the 'stack'
+122+  87C9 F1          >        pop af                      ; 1,0
+122+  87CA C1          >        pop bc                      ; 3,2
+122+  87CB D1          >        pop de                      ; 5,4
+122+  87CC E1          >        pop hl                      ; 7,6
+122+  87CD             >
+122+  87CD             >        ; oops, we've run out of registers, so we need to swap to alternate registers
+122+  87CD 08          >        ex af, af'                  ; swap af with af'
+122+  87CE D9          >        exx
+122+  87CF             >
+122+  87CF             >        ; carry on popping
+122+  87CF F1          >        pop af                      ; 9,8
+122+  87D0 C1          >        pop bc                      ; 11,10
+122+  87D1 D1          >        pop de                      ; 13,12
+122+  87D2 E1          >        pop hl                      ; 15,14
+122+  87D3             >
+122+  87D3             >        ; we move the stack pointer to the attribute screen memory, with our offset row and columnStart
+122+  87D3             >        ; as well as including the 16 bytes that we popped off the buffer stack and stored
+122+  87D3 31 D0 5A    >        ld sp, $5800 + (i * 32) + 0 + 16
+122+  87D6             >
+122+  87D6             >        ; we push back onto the screen memory stack in reverse order
+122+  87D6 E5          >        push hl                     ; copy 15,14 to the screen memory
+122+  87D7 D5          >        push de                     ; copy 13,12 to the screen memory
+122+  87D8 C5          >        push bc                     ; copy 11,10 to the screen memory
+122+  87D9 F5          >        push af                     ; copy 9,8 to the screen memory
+122+  87DA             >
+122+  87DA             >        ; swap back to the original registers
+122+  87DA 08          >        ex af, af'
+122+  87DB D9          >        exx
+122+  87DC             >
+122+  87DC E5          >        push hl                     ; copy 7,6 to the screen memory
+122+  87DD D5          >        push de                     ; copy 5,4 to the screen memory
+122+  87DE C5          >        push bc                     ; copy 3,2 to the screen memory
+122+  87DF F5          >        push af                     ; copy 1,0 to the screen memory
+122+  87E0             >            DoCopy i, 16  ; copy the remaining 16 attributes over to the row
+122+  87E0             >        ; we move the stack pointer to our attribute buffer, with our offset row and columnStart
+122+  87E0 31 D5 82    >        ld sp, AttributeBuffer + (i * 32) + 16
+122+  87E3             >        ; now we start popping the attributes off the 'stack'
+122+  87E3 F1          >        pop af                      ; 1,0
+122+  87E4 C1          >        pop bc                      ; 3,2
+122+  87E5 D1          >        pop de                      ; 5,4
+122+  87E6 E1          >        pop hl                      ; 7,6
+122+  87E7             >
+122+  87E7             >        ; oops, we've run out of registers, so we need to swap to alternate registers
+122+  87E7 08          >        ex af, af'                  ; swap af with af'
+122+  87E8 D9          >        exx
+122+  87E9             >
+122+  87E9             >        ; carry on popping
+122+  87E9 F1          >        pop af                      ; 9,8
+122+  87EA C1          >        pop bc                      ; 11,10
+122+  87EB D1          >        pop de                      ; 13,12
+122+  87EC E1          >        pop hl                      ; 15,14
+122+  87ED             >
+122+  87ED             >        ; we move the stack pointer to the attribute screen memory, with our offset row and columnStart
+122+  87ED             >        ; as well as including the 16 bytes that we popped off the buffer stack and stored
+122+  87ED 31 E0 5A    >        ld sp, $5800 + (i * 32) + 16 + 16
+122+  87F0             >
+122+  87F0             >        ; we push back onto the screen memory stack in reverse order
+122+  87F0 E5          >        push hl                     ; copy 15,14 to the screen memory
+122+  87F1 D5          >        push de                     ; copy 13,12 to the screen memory
+122+  87F2 C5          >        push bc                     ; copy 11,10 to the screen memory
+122+  87F3 F5          >        push af                     ; copy 9,8 to the screen memory
+122+  87F4             >
+122+  87F4             >        ; swap back to the original registers
+122+  87F4 08          >        ex af, af'
+122+  87F5 D9          >        exx
+122+  87F6             >
+122+  87F6 E5          >        push hl                     ; copy 7,6 to the screen memory
+122+  87F7 D5          >        push de                     ; copy 5,4 to the screen memory
+122+  87F8 C5          >        push bc                     ; copy 3,2 to the screen memory
+122+  87F9 F5          >        push af                     ; copy 1,0 to the screen memory
+122+  87FA             >            DoCopy i, 0   ; copy the first 16 attributes over to the row
+122+  87FA             >        ; we move the stack pointer to our attribute buffer, with our offset row and columnStart
+122+  87FA 31 E5 82    >        ld sp, AttributeBuffer + (i * 32) + 0
+122+  87FD             >        ; now we start popping the attributes off the 'stack'
+122+  87FD F1          >        pop af                      ; 1,0
+122+  87FE C1          >        pop bc                      ; 3,2
+122+  87FF D1          >        pop de                      ; 5,4
+122+  8800 E1          >        pop hl                      ; 7,6
+122+  8801             >
+122+  8801             >        ; oops, we've run out of registers, so we need to swap to alternate registers
+122+  8801 08          >        ex af, af'                  ; swap af with af'
+122+  8802 D9          >        exx
+122+  8803             >
+122+  8803             >        ; carry on popping
+122+  8803 F1          >        pop af                      ; 9,8
+122+  8804 C1          >        pop bc                      ; 11,10
+122+  8805 D1          >        pop de                      ; 13,12
+122+  8806 E1          >        pop hl                      ; 15,14
+122+  8807             >
+122+  8807             >        ; we move the stack pointer to the attribute screen memory, with our offset row and columnStart
+122+  8807             >        ; as well as including the 16 bytes that we popped off the buffer stack and stored
+122+  8807 31 F0 5A    >        ld sp, $5800 + (i * 32) + 0 + 16
+122+  880A             >
+122+  880A             >        ; we push back onto the screen memory stack in reverse order
+122+  880A E5          >        push hl                     ; copy 15,14 to the screen memory
+122+  880B D5          >        push de                     ; copy 13,12 to the screen memory
+122+  880C C5          >        push bc                     ; copy 11,10 to the screen memory
+122+  880D F5          >        push af                     ; copy 9,8 to the screen memory
+122+  880E             >
+122+  880E             >        ; swap back to the original registers
+122+  880E 08          >        ex af, af'
+122+  880F D9          >        exx
+122+  8810             >
+122+  8810 E5          >        push hl                     ; copy 7,6 to the screen memory
+122+  8811 D5          >        push de                     ; copy 5,4 to the screen memory
+122+  8812 C5          >        push bc                     ; copy 3,2 to the screen memory
+122+  8813 F5          >        push af                     ; copy 1,0 to the screen memory
+122+  8814             >            DoCopy i, 16  ; copy the remaining 16 attributes over to the row
+122+  8814             >        ; we move the stack pointer to our attribute buffer, with our offset row and columnStart
+122+  8814 31 F5 82    >        ld sp, AttributeBuffer + (i * 32) + 16
+122+  8817             >        ; now we start popping the attributes off the 'stack'
+122+  8817 F1          >        pop af                      ; 1,0
+122+  8818 C1          >        pop bc                      ; 3,2
+122+  8819 D1          >        pop de                      ; 5,4
+122+  881A E1          >        pop hl                      ; 7,6
+122+  881B             >
+122+  881B             >        ; oops, we've run out of registers, so we need to swap to alternate registers
+122+  881B 08          >        ex af, af'                  ; swap af with af'
+122+  881C D9          >        exx
+122+  881D             >
+122+  881D             >        ; carry on popping
+122+  881D F1          >        pop af                      ; 9,8
+122+  881E C1          >        pop bc                      ; 11,10
+122+  881F D1          >        pop de                      ; 13,12
+122+  8820 E1          >        pop hl                      ; 15,14
+122+  8821             >
+122+  8821             >        ; we move the stack pointer to the attribute screen memory, with our offset row and columnStart
+122+  8821             >        ; as well as including the 16 bytes that we popped off the buffer stack and stored
+122+  8821 31 00 5B    >        ld sp, $5800 + (i * 32) + 16 + 16
+122+  8824             >
+122+  8824             >        ; we push back onto the screen memory stack in reverse order
+122+  8824 E5          >        push hl                     ; copy 15,14 to the screen memory
+122+  8825 D5          >        push de                     ; copy 13,12 to the screen memory
+122+  8826 C5          >        push bc                     ; copy 11,10 to the screen memory
+122+  8827 F5          >        push af                     ; copy 9,8 to the screen memory
+122+  8828             >
+122+  8828             >        ; swap back to the original registers
+122+  8828 08          >        ex af, af'
+122+  8829 D9          >        exx
+122+  882A             >
+122+  882A E5          >        push hl                     ; copy 7,6 to the screen memory
+122+  882B D5          >        push de                     ; copy 5,4 to the screen memory
+122+  882C C5          >        push bc                     ; copy 3,2 to the screen memory
+122+  882D F5          >        push af                     ; copy 1,0 to the screen memory
+122+  882E             >        endr
+123+  882E ED 7B 03 80    ld sp, (CopyOfStackPointer)   ; restore the stack pointer from memory
+124+  8832 FB             ei                            ; enable interrupts
+125+  8833 C9             ret
+126+  8834
+# file closed: /Users/darren/dev/spectrum/zx/project/src/library/doubleBufferAttributes.asm
+ 11   8834                include "library/colours.asm"
+# file opened: /Users/darren/dev/spectrum/zx/project/src/library/colours.asm
+  1+  8834              STABLE: equ 0 ; %00000000
+  2+  8834              FLASHING: equ 128 ; %10000000
+  3+  8834
+  4+  8834              DULL: equ 0 ; %00000000
+  5+  8834              BRIGHT: equ 64 ; %01000000
+  6+  8834
+  7+  8834              WHITE_PAPER: equ 56; %00111000
+  8+  8834              YELLOW_PAPER: equ 48; %00110000
+  9+  8834              CYAN_PAPER: equ 40; %00101000
+ 10+  8834              GREEN_PAPER: equ 32; %00100000
+ 11+  8834              MAGENTA_PAPER: equ 24; %00011000
+ 12+  8834              RED_PAPER: equ 16; %00010000
+ 13+  8834              BLUE_PAPER: equ 8; %00001000
+ 14+  8834              BLACK_PAPER: equ 0; %00000000
+ 15+  8834
+ 16+  8834              WHITE_INK: equ 7; %00000111
+ 17+  8834              YELLOW_INK: equ 6; %00000110
+ 18+  8834              CYAN_INK: equ 5; %00000101
+ 19+  8834              GREEN_INK: equ 4; %00000100
+ 20+  8834              MAGENTA_INK: equ 3; %00000011
+ 21+  8834              RED_INK: equ 2; %00000010
+ 22+  8834              BLUE_INK: equ 1; %00000001
+ 23+  8834              BLACK_INK: equ 0; %00000000
+# file closed: /Users/darren/dev/spectrum/zx/project/src/library/colours.asm
+ 12   8834
+ 13   8834              ; store the previous timer value
+ 14   8834 00           previousTimer: defb 0
+ 15   8835
+ 16   8835              ; directions
+ 17   8835              up: equ 1
+ 18   8835              down: equ 2
+ 19   8835              left: equ 4
+ 20   8835              right: equ 8
+ 21   8835
+ 22   8835              ; well, just blobs of colour at the moment
+ 23   8835              ; direction, x, y, colour
+ 24   8835              aliens:
+ 25   8835 08 00 00 00    db right, 0,0, BLACK_PAPER
+ 26   8839 02 00 00 00    db down, 0, 0, BLACK_PAPER
+ 27   883D 04 1F 17 00    db left, 31, 23, BLACK_PAPER
+ 28   8841 02 1F 00 00    db down, 31,0, BLACK_PAPER
+ 29   8845 01 1F 17 00    db up, 31, 23, BLACK_PAPER
+ 30   8849 08 08 17 00    db right, 8,23, BLACK_PAPER
+ 31   884D 0A 0F 10 28    db right + down, 15, 16, CYAN_PAPER
+ 32   8851 04 03 04 28    db left, 3,4, CYAN_PAPER
+ 33   8855 08 01 02 28    db right, 1,2, CYAN_PAPER
+ 34   8859 0A 0A 0A 28    db right + down, 10, 10, CYAN_PAPER
+ 35   885D 02 14 14 28    db down, 20, 20, CYAN_PAPER
+ 36   8861 01 15 14 28    db up, 21,20, CYAN_PAPER
+ 37   8865 06 20 14 18    db down + left, 32, 20, MAGENTA_PAPER
+ 38   8869 0A 05 06 28    db right + down, 5, 6  , CYAN_PAPER
+ 39   886D 04 0D 0E 28    db left, 13,14, CYAN_PAPER
+ 40   8871 08 0B 16 28    db right, 11,22, CYAN_PAPER
+ 41   8875 0A 01 01 28    db right + down, 1, 1, CYAN_PAPER
+ 42   8879 02 02 02 28    db down, 2, 2, CYAN_PAPER
+ 43   887D 01 0B 14 28    db up, 11,20, CYAN_PAPER
+ 44   8881 06 16 0A 28    db down + left, 22, 10, CYAN_PAPER
+ 45   8885 06 20 00 18    db down + left, 32, 0, MAGENTA_PAPER
+ 46   8889 06 1E 02 18    db down + left, 30, 2, MAGENTA_PAPER
+ 47   888D 06 1C 04 18    db down + left, 28, 4, MAGENTA_PAPER
+ 48   8891 01 04 17 00    db up, 4, 23, BLACK_PAPER
+ 49   8895 01 05 17 00    db up, 5, 23, BLACK_PAPER
+ 50   8899 02 0A 00 00    db down, 10, 0, BLACK_PAPER
+ 51   889D 02 0B 00 00    db down, 11, 0, BLACK_PAPER
+ 52   88A1 01 0F 17 30    db up, 15, 23, YELLOW_PAPER
+ 53   88A5 01 10 17 30    db up, 16, 23, YELLOW_PAPER
+ 54   88A9 02 11 00 20    db down, 17, 0, GREEN_PAPER
+ 55   88AD 02 12 00 20    db down, 18, 0, GREEN_PAPER
+ 56   88B1 04 20 0A 10    db left, 32, 10, RED_PAPER
+ 57   88B5 04 20 0B 10    db left, 32, 11, RED_PAPER
+ 58   88B9 08 00 0A 10    db right, 0, 10, RED_PAPER
+ 59   88BD 08 00 0B 10    db right, 0, 11, RED_PAPER
+ 60   88C1 02 0F 00 10    db down, 15, 0, RED_PAPER
+ 61   88C5 02 10 00 10    db down, 16, 0, RED_PAPER
+ 62   88C9 01 0F 17 10    db up, 15, 23, RED_PAPER
+ 63   88CD 01 10 17 10    db up, 16, 23, RED_PAPER
+ 64   88D1 06 1C 00 08    db down + left, 28, 0, BLUE_PAPER
+ 65   88D5 06 1D 01 08    db down + left, 29, 1, BLUE_PAPER
+ 66   88D9 06 1E 02 08    db down + left, 30, 2, BLUE_PAPER
+ 67   88DD
+ 68   88DD              numberOfAliens: equ ($ - aliens) / 4
+ 69   88DD
+ 70   88DD              start:
+ 71   88DD                ; This section of code sets up the IM2 interrupt vector table and enables interrupts.
+ 72   88DD
+ 73   88DD                ; Disable interrupts
+ 74   88DD F3             di
+ 75   88DE
+ 76   88DE                ; Load the address of the IM2 interrupt vector table into DE
+ 77   88DE 11 00 FE       ld de, IM2_TABLE
+ 78   88E1
+ 79   88E1                ; Load the address of the IM2 interrupt handler into HL
+ 80   88E1 21 FD FD       ld hl, IM2_VECTOR
+ 81   88E4
+ 82   88E4                ; Load the value of D into A and set the interrupt mode to 2
+ 83   88E4 7A             ld a,d
+ 84   88E5 ED 47          ld i,a
+ 85   88E7 ED 5E          im 2
+ 86   88E9
+ 87   88E9                ; Fill the IM2 interrupt vector table with the address of the IM2 interrupt handler
+ 88   88E9              .fill_loop:
+ 89   88E9 7D             ld a,l
+ 90   88EA 12             ld (de),a
+ 91   88EB 1C             inc e
+ 92   88EC C2 E9 88       jp nz, .fill_loop
+ 93   88EF 14             inc d
+ 94   88F0 12             ld (de), a
+ 95   88F1
+ 96   88F1              ; Set the IM2 interrupt vector to point to the IM2 interrupt handler
+ 97   88F1 36 C3          ld (hl),$c3
+ 98   88F3 2C             inc l
+ 99   88F4 36 48          ld (hl),low im2_handler
+100   88F6 2C             inc l
+101   88F7 36 8A          ld (hl),high im2_handler
+102   88F9
+103   88F9              ; Enable interrupts
+104   88F9 FB             ei
+105   88FA
+106   88FA
+107   88FA
+108   88FA              gameLoop:
+109   88FA
+110   88FA              .wait:
+111   88FA 21 34 88       ld hl, previousTimer
+112   88FD 3A 78 5C       ld a, (23672) ; get the timer
+113   8900 96             sub (hl) ; get the difference between current and previous timer
+114   8901
+115   8901              .keepWaiting2:
+116   8901 FE 02          cp 2; have we waited 2 ticks?
+117   8903 30 03          jr nc, .wait0 ; no more delay
+118   8905
+119   8905 C3 FA 88       jp .wait ; wait some more
+120   8908              .wait0:
+121   8908 3A 78 5C       ld a, (23672) ; get the timer
+122   890B 32 34 88       ld (previousTimer), a ; store
+123   890E
+124   890E 3E 00          ld a, 0
+125   8910 D3 FE          out (254),a
+126   8912
+127   8912 DD 21 35 88    ld ix, aliens
+128   8916 06 2A          ld b, numberOfAliens
+129   8918 0E 00          ld c,0
+130   891A              .nextAlien:
+131   891A C5             push bc
+132   891B
+133   891B CD 4D 89       call showAlien
+134   891E C1             pop bc
+135   891F
+136   891F 11 04 00       ld de, 4 ; size of the table entry
+137   8922 DD 19          add ix, de ; move onto next alien
+138   8924 10 F4          djnz .nextAlien
+139   8926
+140   8926              .display:
+141   8926 CD 49 83       call copyScreenAttributes
+142   8929 CD 2F 89       call undrawAliens
+143   892C C3 FA 88       jp gameLoop
+144   892F
+145   892F              ; undraws the alien and then moves it
+146   892F              undrawAliens:
+147   892F DD 21 35 88    ld ix, aliens
+148   8933 06 2A          ld b, numberOfAliens
+149   8935 0E 00          ld c,0
+150   8937              .loop:
+151   8937 C5             push bc
+152   8938 CD 55 89       call getAlienAddress
+153   893B 3E 38          ld a, WHITE_PAPER
+154   893D 77             ld (hl), a
+155   893E
+156   893E
+157   893E CD 65 89       call moveAlien
+158   8941 CD 9A 89       call checkBounds
+159   8944 C1             pop bc
+160   8945
+161   8945 11 04 00       ld de, 4 ; size of the table entry
+162   8948 DD 19          add ix, de ; next alien
+163   894A 10 EB          djnz .loop
+164   894C
+165   894C C9             ret
+166   894D
+167   894D              showAlien:
+168   894D CD 55 89      call getAlienAddress
+169   8950
+170   8950 DD 7E 03       ld a, (ix+3)
+171   8953 77             ld (hl), a ; put it in the buffer
+172   8954
+173   8954 C9             ret
+174   8955
+175   8955              getAlienAddress:
+176   8955 DD 7E 00       ld a, (ix) ; get the status / direction
+177   8958 FE FF          cp 255 ; is it disabled?
+178   895A C8             ret z ; yes, return
+179   895B
+180   895B DD 46 01       ld b, (ix+1) ; get x coordinate
+181   895E DD 4E 02       ld c, (ix+2) ; get y coordinate
+182   8961
+183   8961 CD 35 83       call CalculateAttributeBufferAddress
+184   8964 C9             ret
+185   8965
+186   8965              moveAlien:
+187   8965 DD 7E 00       ld a, (ix)
+188   8968 E6 01          and up
+189   896A C4 86 89       call nz, moveAlienUp
+190   896D
+191   896D DD 7E 00       ld a, (ix)
+192   8970 E6 02          and down
+193   8972 C4 8B 89       call nz, moveAlienDown
+194   8975
+195   8975 DD 7E 00       ld a, (ix)
+196   8978 E6 04          and left
+197   897A C4 90 89       call nz, moveAlienLeft
+198   897D
+199   897D DD 7E 00       ld a, (ix)
+200   8980 E6 08          and right
+201   8982 C4 95 89       call nz, moveAlienRight
+202   8985
+203   8985 C9             ret
+204   8986
+205   8986              moveAlienUp:
+206   8986 0D             dec c
+207   8987 DD 71 02       ld (ix+2), c
+208   898A C9             ret
+209   898B              moveAlienDown:
+210   898B 0C             inc c
+211   898C DD 71 02       ld (ix+2), c
+212   898F C9             ret
+213   8990              moveAlienLeft:
+214   8990 05             dec b
+215   8991 DD 70 01       ld (ix+1), b
+216   8994 C9             ret
+217   8995              moveAlienRight:
+218   8995 04             inc b
+219   8996 DD 70 01       ld (ix+1), b
+220   8999 C9             ret
+221   899A
+222   899A              checkBounds:
+223   899A                ; the position is stored in bc
+224   899A DD 7E 00       ld a, (ix) ;  load the direction / status into D
+225   899D
+226   899D              .checkRight:
+227   899D                ; are we going right
+228   899D CB 5F          bit 3, a
+229   899F 28 0F          jr z, .checkLeft
+230   89A1                ; if we are going right, check if we've hit the right boundary
+231   89A1 78             ld a, b ; load the X position into A
+232   89A2 FE 1F          cp 31                    ; compare with the right boundary
+233   89A4 20 0A          jr nz, .checkLeft        ; if A < 31, we haven't hit the right boundary
+234   89A6 DD 7E 00       ld a, (ix)
+235   89A9 E6 F7          and 255 - right
+236   89AB F6 04          or left
+237   89AD DD 77 00       ld (ix), a
+238   89B0
+239   89B0
+240   89B0              .checkLeft:
+241   89B0                ; are we going left
+242   89B0 DD 7E 00       ld a, (ix) ;  load the direction / status into D
+243   89B3 CB 57          bit 2, a
+244   89B5 28 0F          jr z, .checkUp
+245   89B7                ; if we are going left, check if we've hit the left boundary
+246   89B7 78             ld a, b ; load the X position into A
+247   89B8 FE 00          cp 0
+248   89BA 20 0A          jr nz, .checkUp
+249   89BC DD 7E 00       ld a, (ix)
+250   89BF E6 FB          and 255 - left
+251   89C1 F6 08          or right
+252   89C3 DD 77 00       ld (ix), a
+253   89C6
+254   89C6              .checkUp:
+255   89C6                ; are we going up
+256   89C6 DD 7E 00       ld a, (ix) ;  load the direction / status into D
+257   89C9 CB 47          bit 0, a
+258   89CB 28 12          jr z, .checkDown
+259   89CD                ; if we are going up, check if we've hit the top boundary
+260   89CD 79             ld a, c
+261   89CE FE 00          cp 0
+262   89D0 20 0D          jr nz, .checkDown
+263   89D2 DD 7E 00       ld a, (ix)
+264   89D5 E6 FE          and 255 - up
+265   89D7 F6 02          or down
+266   89D9 DD 77 00       ld (ix), a
+267   89DC C3 F5 89       jp .done
+268   89DF
+269   89DF              .checkDown:
+270   89DF                ; are we going down
+271   89DF DD 7E 00       ld a, (ix) ;  load the direction / status into D
+272   89E2 CB 4F          bit 1, a
+273   89E4 28 0F          jr z, .done
+274   89E6                ; if we are going down, check if we've hit the bottom boundary
+275   89E6 79             ld a, c
+276   89E7 FE 17          cp 23                    ; compare with the bottom boundary
+277   89E9 20 0A          jr nz, .done             ; if A < 23, we haven't hit the bottom boundary
+278   89EB DD 7E 00       ld a, (ix)
+279   89EE E6 FD          and 255 - down
+280   89F0 F6 01          or up
+281   89F2 DD 77 00       ld (ix), a
+282   89F5              .done:
+283   89F5 C9             ret
+284   89F6
+285   89F6
+286   89F6 FE 1F          cp 31                    ; compare with the right boundary
+287   89F8 30 3B          jr nc, hitRightBoundary  ; if A >= 31, we've hit the right boundary
+288   89FA B7             or a                     ; check if A is 0 (the left boundary)
+289   89FB 28 25          jr z, hitLeftBoundary    ; if A == 0, we've hit the left boundary
+290   89FD              checkUpperLowerScreenBounds:
+291   89FD                                   ; move to Y position in memory
+292   89FD 79             ld a, c               ; load the Y position into A
+293   89FE FE 17          cp 23                    ; compare with the bottom boundary
+294   8A00 30 12          jr nc, hitBottomBoundary ; if A >= 23, we've hit the bottom boundary
+295   8A02 B7             or a                     ; check if A is 0 (the top boundary)
+296   8A03 28 01          jr z, hitTopBoundary     ; if A == 0, we've hit the top boundary
+297   8A05
+298   8A05 C9             ret
+299   8A06
+300   8A06              hitTopBoundary:
+301   8A06 DD 7E 00       ld a, (ix)
+302   8A09
+303   8A09 CB 47          bit 0, a            ; Check if the "down" bit is set in A.
+304   8A0B C8             ret z  ; If the "down" bit is not set, we don't need to change the direction.
+305   8A0C
+306   8A0C
+307   8A0C E6 FE          and 255 - up
+308   8A0E F6 02          or down
+309   8A10 DD 77 00       ld (ix), a
+310   8A13 C9             ret
+311   8A14
+312   8A14              ; This function is called when the alien hits the bottom boundary of the screen.
+313   8A14              ; It plays a sound effect, changes the direction of the alien to move up, and returns.
+314   8A14
+315   8A14              hitBottomBoundary:
+316   8A14 DD 7E 00       ld a, (ix)          ; Load the current direction of the alien into A.
+317   8A17
+318   8A17 CB 4F          bit 1, a            ; Check if the "down" bit is set in A.
+319   8A19 C8             ret z  ; If the "down" bit is not set, we don't need to change the direction.
+320   8A1A
+321   8A1A
+322   8A1A E6 FD          and 255 - down      ; Clear the "down" bit in A by ANDing it with the bitwise complement of "down".
+323   8A1C F6 01          or up               ; Set the "up" bit in A by ORing it with "up".
+324   8A1E DD 77 00       ld (ix), a          ; Store the new direction back into memory.
+325   8A21 C9             ret                 ; Return from the function.
+326   8A22
+327   8A22              hitLeftBoundary:
+328   8A22 DD 7E 00       ld a, (ix)
+329   8A25 CB 5F          bit 3,a
+330   8A27 CA FD 89       jp z, checkUpperLowerScreenBounds ; If the "left" bit is not set, we don't need to change the direction.
+331   8A2A E6 FB          and 255 - left
+332   8A2C F6 08          or right
+333   8A2E DD 77 00       ld (ix), a
+334   8A31 C3 FD 89       jp checkUpperLowerScreenBounds
+335   8A34 C9             ret
+336   8A35              hitRightBoundary:
+337   8A35 DD 7E 00       ld a, (ix)
+338   8A38
+339   8A38 CB 67          bit 4, a ; Check if the "right" bit is set in A.
+340   8A3A CA FD 89       jp z, checkUpperLowerScreenBounds ; If the "right" bit is not set, we don't need to change the direction.
+341   8A3D
+342   8A3D E6 F7          and 255 - right
+343   8A3F F6 04          or left
+344   8A41 DD 77 00       ld (ix), a
+345   8A44 C3 FD 89       jp checkUpperLowerScreenBounds
+346   8A47 C9             ret
+347   8A48
+348   8A48              im2_handler:
+349   8A48 F5             push af
+350   8A49 C5             push bc
+351   8A4A D5             push de
+352   8A4B E5             push hl
+353   8A4C 08             ex af,af'
+354   8A4D D9             exx
+355   8A4E F5             push af
+356   8A4F C5             push bc
+357   8A50 D5             push de
+358   8A51 E5             push hl
+359   8A52 DD E5          push ix
+360   8A54 FD E5          push iy
+361   8A56
+362   8A56                ; Update screen attributes here
+363   8A56                ; ld hl, attrBuffer ; Load address of attribute buffer into HL register pair
+364   8A56                ; ld de, $5800 ; Load address of screen attributes into DE register pair
+365   8A56                ; ld bc, 768 ; Load number of bytes to copy into BC register pair
+366   8A56                ; ldir ; Copy bytes from attribute buffer to screen attributes
+367   8A56
+368   8A56
+369   8A56                ;rst 56 ; read the keys and update clock
+370   8A56 2A 78 5C       ld hl, (23672)
+371   8A59 23             inc hl
+372   8A5A 22 78 5C       ld (23672), hl
+373   8A5D 7C             ld a,h
+374   8A5E B5             or l
+375   8A5F
+376   8A5F                ; ^^ this is the same as rst 56
+377   8A5F
+378   8A5F FD E1          pop iy
+379   8A61 DD E1          pop ix
+380   8A63 E1             pop hl
+381   8A64 D1             pop de
+382   8A65 C1             pop bc
+383   8A66 F1             pop af
+384   8A67 08             ex af,af'
+385   8A68 D9             exx
+386   8A69 E1             pop hl
+387   8A6A D1             pop de
+388   8A6B C1             pop bc
+389   8A6C F1             pop af
+390   8A6D FB             ei
+391   8A6E C9             ret
+392   8A6F
+393   8A6F
+394   8A6F              ; Deployment
+395   8A6F                savesna "myapp.sna",start  ; Save the program as a snapshot file
+# file closed: /Users/darren/dev/spectrum/zx/project/src/myapp.asm
