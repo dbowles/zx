@@ -31,12 +31,12 @@ right: equ 8
 ; well, just blobs of colour at the moment
 ; direction, x, y, colour
 aliens:
-  db right, 0,0, BLACK_PAPER
-  db down, 0, 0, BLACK_PAPER
-  db left, 31, 23, BLACK_PAPER
-  db down, 31,0, BLACK_PAPER
-  db up, 31, 23, BLACK_PAPER
-  db right, 8,23, BLACK_PAPER
+  db right, 0,0, WHITE_PAPER
+  db down, 0, 0, WHITE_PAPER
+  db left, 31, 23, WHITE_PAPER
+  db down, 31,0, WHITE_PAPER
+  db up, 31, 23, WHITE_PAPER
+  db right, 8,23, WHITE_PAPER
   db right + down, 15, 16, CYAN_PAPER  
   db left, 3,4, CYAN_PAPER
   db right, 1,2, CYAN_PAPER
@@ -54,10 +54,10 @@ aliens:
   db down + left, 32, 0, MAGENTA_PAPER
   db down + left, 30, 2, MAGENTA_PAPER
   db down + left, 28, 4, MAGENTA_PAPER
-  db up, 4, 23, BLACK_PAPER
-  db up, 5, 23, BLACK_PAPER
-  db down, 10, 0, BLACK_PAPER
-  db down, 11, 0, BLACK_PAPER
+  db up, 4, 23, YELLOW_PAPER
+  db up, 5, 23, YELLOW_PAPER
+  db down, 10, 0, MAGENTA_PAPER
+  db down, 11, 0, MAGENTA_PAPER
   db up, 15, 23, YELLOW_PAPER
   db up, 16, 23, YELLOW_PAPER
   db down, 17, 0, GREEN_PAPER
@@ -114,120 +114,170 @@ start:
 
 
 
+; gameLoop - Main game loop
 gameLoop:
-
-.wait:
+  ; Wait for 2 ticks
+.waitForTwoTicks:
+  ; Load the previous timer value into HL
   ld hl, previousTimer
-  ld a, (23672) ; get the timer
-  sub (hl) ; get the difference between current and previous timer
 
-.keepWaiting2:
-  cp 2; have we waited 2 ticks?
-  jr nc, .wait0 ; no more delay
+  ; Get the current timer value and subtract the previous timer value
+  ld a, (23672)
+  sub (hl)
 
-  jp .wait ; wait some more
-.wait0:
-  ld a, (23672) ; get the timer
-  ld (previousTimer), a ; store
+  ; Check if we've waited for 2 ticks
+.checkIfTwoTicksWaited:
+  cp 2
+  jr nc, .twoTicksWaited ; no more delay
 
+  ; If we haven't waited for 2 ticks yet, jump back to the start of the loop
+  jp .waitForTwoTicks
+
+.twoTicksWaited:
+  ; If we've waited for 2 ticks, store the current timer value as the previous timer value
+  ld a, (23672)
+  ld (previousTimer), a
+
+  ; set the border colour to black
   ld a, 0
-  out (254),a
+  out (254), a
 
+  ; Loop through the aliens table and show each alien
   ld ix, aliens
   ld b, numberOfAliens
-  ld c,0
-.nextAlien:
+  ld c, 0
+.showAliensLoop:
   push bc
 
   call showAlien
+
   pop bc
 
+  ; Move onto the next alien in the table
   ld de, 4 ; size of the table entry
-  add ix, de ; move onto next alien
-  djnz .nextAlien
+  add ix, de
+  djnz .showAliensLoop
 
 .display:
+  ; Copy the attributes buffer to the screen attributes
   call copyScreenAttributes
+
+  ; Undraw the aliens (and move them)
   call undrawAliens
+
+  ; Jump back to the start of the loop
   jp gameLoop
 
-; undraws the alien and then moves it
+
+; undrawAliens - Undraws the alien and then moves it
 undrawAliens:
-  ld ix, aliens
-  ld b, numberOfAliens
-  ld c,0
+  ld ix, aliens ; Load the address of the aliens table into IX
+  ld b, numberOfAliens ; Load the number of aliens into B
+  ld c, 0 ; Initialize the loop counter
+
 .loop:
-  push bc
+  push bc ; Save the loop counter on the stack
+
+  ; Get the address of the current alien
   call getAlienAddress
-  ld a, WHITE_PAPER
+
+  ; Set the paper color to black to 'undraw' the alien
+  ld a, BLACK_PAPER
   ld (hl), a
 
-  
+  ; Move the alien
   call moveAlien
+
+  ; Check if the alien is within the screen bounds
   call checkBounds
-  pop bc
 
+  pop bc ; Restore the loop counter from the stack
+
+  ; Move onto the next alien in the table
   ld de, 4 ; size of the table entry
-  add ix, de ; next alien
-  djnz .loop
+  add ix, de
+  djnz .loop ; Decrement B and jump back to the start of the loop if B is not zero
 
+  ; Return from the subroutine
   ret
 
+; showAlien - Displays the alien on the screen
 showAlien:
- call getAlienAddress
+  ; Get the address of the current alien
+  call getAlienAddress
 
+  ; Get the color of the alien from the table and put it in the buffer
   ld a, (ix+3)
-  ld (hl), a ; put it in the buffer
+  ld (hl), a
 
+  ; Return from the subroutine
   ret
 
+; getAlienAddress - Gets the address of the current alien in the attribute buffer
 getAlienAddress:
-  ld a, (ix) ; get the status / direction
-  cp 255 ; is it disabled?
-  ret z ; yes, return
+  ; Check if the alien is disabled
+  ld a, (ix) ; Load the status/direction byte into A
+  cp 255 ; Check if it's equal to 255 (disabled)
+  ret z ; If it's disabled, return
 
-  ld b, (ix+1) ; get x coordinate
-  ld c, (ix+2) ; get y coordinate
+  ; Get the x and y coordinates of the alien
+  ld b, (ix+1) ; Load the x coordinate into B
+  ld c, (ix+2) ; Load the y coordinate into C
 
+  ; Calculate the address of the alien in the attribute buffer
   call CalculateAttributeBufferAddress
+
+  ; Return from the subroutine with the address in HL
   ret
 
+; moveAlien - Moves the alien in the direction specified by its status byte
 moveAlien:
+  ; Check if the alien is moving up
   ld a, (ix)
   and up
   call nz, moveAlienUp
 
+  ; Check if the alien is moving down
   ld a, (ix)
   and down
   call nz, moveAlienDown
 
+  ; Check if the alien is moving left
   ld a, (ix)
   and left
   call nz, moveAlienLeft
 
+  ; Check if the alien is moving right
   ld a, (ix)
   and right
   call nz, moveAlienRight
 
   ret
 
+; moveAlienUp - Moves the alien up by decrementing its y coordinate
 moveAlienUp:
-  dec c
-  ld (ix+2), c
-  ret
-moveAlienDown:
-  inc c
-  ld (ix+2), c
-  ret
-moveAlienLeft:
-  dec b
-  ld (ix+1), b
-  ret
-moveAlienRight:
-  inc b
-  ld (ix+1), b
+  dec c ; Decrement the y coordinate
+  ld (ix+2), c ; Store the new y coordinate in the aliens table
   ret
 
+; moveAlienDown - Moves the alien down by incrementing its y coordinate
+moveAlienDown:
+  inc c ; Increment the y coordinate
+  ld (ix+2), c ; Store the new y coordinate in the aliens table
+  ret
+
+; moveAlienLeft - Moves the alien left by decrementing its x coordinate
+moveAlienLeft:
+  dec b ; Decrement the x coordinate
+  ld (ix+1), b ; Store the new x coordinate in the aliens table
+  ret
+
+; moveAlienRight - Moves the alien right by incrementing its x coordinate
+moveAlienRight:
+  inc b ; Increment the x coordinate
+  ld (ix+1), b ; Store the new x coordinate in the aliens table
+  ret
+  
 checkBounds:
   ; the position is stored in bc
   ld a, (ix) ;  load the direction / status into D
@@ -292,67 +342,6 @@ checkBounds:
   ret
 
 
-  cp 31                    ; compare with the right boundary
-  jr nc, hitRightBoundary  ; if A >= 31, we've hit the right boundary
-  or a                     ; check if A is 0 (the left boundary)
-  jr z, hitLeftBoundary    ; if A == 0, we've hit the left boundary
-checkUpperLowerScreenBounds:
-                     ; move to Y position in memory
-  ld a, c               ; load the Y position into A
-  cp 23                    ; compare with the bottom boundary
-  jr nc, hitBottomBoundary ; if A >= 23, we've hit the bottom boundary
-  or a                     ; check if A is 0 (the top boundary)
-  jr z, hitTopBoundary     ; if A == 0, we've hit the top boundary
-
-  ret
-
-hitTopBoundary:  
-  ld a, (ix)
-
-  bit 0, a            ; Check if the "down" bit is set in A.
-  ret z  ; If the "down" bit is not set, we don't need to change the direction.
-
-
-  and 255 - up
-  or down
-  ld (ix), a
-  ret
-
-; This function is called when the alien hits the bottom boundary of the screen.
-; It plays a sound effect, changes the direction of the alien to move up, and returns.
-
-hitBottomBoundary:
-  ld a, (ix)          ; Load the current direction of the alien into A.
-  
-  bit 1, a            ; Check if the "down" bit is set in A.
-  ret z  ; If the "down" bit is not set, we don't need to change the direction.
-
-
-  and 255 - down      ; Clear the "down" bit in A by ANDing it with the bitwise complement of "down".
-  or up               ; Set the "up" bit in A by ORing it with "up".
-  ld (ix), a          ; Store the new direction back into memory.
-  ret                 ; Return from the function.
-
-hitLeftBoundary:
-  ld a, (ix)
-  bit 3,a
-  jp z, checkUpperLowerScreenBounds ; If the "left" bit is not set, we don't need to change the direction.
-  and 255 - left
-  or right
-  ld (ix), a
-  jp checkUpperLowerScreenBounds
-  ret
-hitRightBoundary:
-  ld a, (ix)
-
-  bit 4, a ; Check if the "right" bit is set in A.
-  jp z, checkUpperLowerScreenBounds ; If the "right" bit is not set, we don't need to change the direction.
-
-  and 255 - right
-  or left
-  ld (ix), a
-  jp checkUpperLowerScreenBounds
-  ret
 
 im2_handler:
   push af

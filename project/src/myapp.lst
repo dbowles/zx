@@ -88,7 +88,7 @@
  67+  8005
  68+  8005              ; here's our buffer - let's initialise it to all white paper, black ink
  69+  8005              AttributeBuffer:
- 70+  8005 38 38 38...      block 768, STABLE + DULL + WHITE_PAPER + BLACK_INK
+ 70+  8005 07 07 07...      block 768, STABLE + DULL + BLACK_PAPER + WHITE_INK
  71+  8305
  72+  8305              ; here's our lookup table
  73+  8305              AttributeBufferLookup:
@@ -2003,12 +2003,12 @@
  31   8833              ; well, just blobs of colour at the moment
  32   8833              ; direction, x, y, colour
  33   8833              aliens:
- 34   8833 08 00 00 00    db right, 0,0, BLACK_PAPER
- 35   8837 02 00 00 00    db down, 0, 0, BLACK_PAPER
- 36   883B 04 1F 17 00    db left, 31, 23, BLACK_PAPER
- 37   883F 02 1F 00 00    db down, 31,0, BLACK_PAPER
- 38   8843 01 1F 17 00    db up, 31, 23, BLACK_PAPER
- 39   8847 08 08 17 00    db right, 8,23, BLACK_PAPER
+ 34   8833 08 00 00 38    db right, 0,0, WHITE_PAPER
+ 35   8837 02 00 00 38    db down, 0, 0, WHITE_PAPER
+ 36   883B 04 1F 17 38    db left, 31, 23, WHITE_PAPER
+ 37   883F 02 1F 00 38    db down, 31,0, WHITE_PAPER
+ 38   8843 01 1F 17 38    db up, 31, 23, WHITE_PAPER
+ 39   8847 08 08 17 38    db right, 8,23, WHITE_PAPER
  40   884B 0A 0F 10 28    db right + down, 15, 16, CYAN_PAPER
  41   884F 04 03 04 28    db left, 3,4, CYAN_PAPER
  42   8853 08 01 02 28    db right, 1,2, CYAN_PAPER
@@ -2026,10 +2026,10 @@
  54   8883 06 20 00 18    db down + left, 32, 0, MAGENTA_PAPER
  55   8887 06 1E 02 18    db down + left, 30, 2, MAGENTA_PAPER
  56   888B 06 1C 04 18    db down + left, 28, 4, MAGENTA_PAPER
- 57   888F 01 04 17 00    db up, 4, 23, BLACK_PAPER
- 58   8893 01 05 17 00    db up, 5, 23, BLACK_PAPER
- 59   8897 02 0A 00 00    db down, 10, 0, BLACK_PAPER
- 60   889B 02 0B 00 00    db down, 11, 0, BLACK_PAPER
+ 57   888F 01 04 17 30    db up, 4, 23, YELLOW_PAPER
+ 58   8893 01 05 17 30    db up, 5, 23, YELLOW_PAPER
+ 59   8897 02 0A 00 18    db down, 10, 0, MAGENTA_PAPER
+ 60   889B 02 0B 00 18    db down, 11, 0, MAGENTA_PAPER
  61   889F 01 0F 17 30    db up, 15, 23, YELLOW_PAPER
  62   88A3 01 10 17 30    db up, 16, 23, YELLOW_PAPER
  63   88A7 02 11 00 20    db down, 17, 0, GREEN_PAPER
@@ -2077,296 +2077,285 @@
 105   88EF              ; Set the IM2 interrupt vector to point to the IM2 interrupt handler
 106   88EF 36 C3          ld (hl),$c3
 107   88F1 2C             inc l
-108   88F2 36 46          ld (hl),low im2_handler
+108   88F2 36 F4          ld (hl),low im2_handler
 109   88F4 2C             inc l
-110   88F5 36 8A          ld (hl),high im2_handler
+110   88F5 36 89          ld (hl),high im2_handler
 111   88F7
 112   88F7              ; Enable interrupts
 113   88F7 FB             ei
 114   88F8
 115   88F8
 116   88F8
-117   88F8              gameLoop:
-118   88F8
-119   88F8              .wait:
-120   88F8 21 32 88       ld hl, previousTimer
-121   88FB 3A 78 5C       ld a, (23672) ; get the timer
-122   88FE 96             sub (hl) ; get the difference between current and previous timer
-123   88FF
-124   88FF              .keepWaiting2:
-125   88FF FE 02          cp 2; have we waited 2 ticks?
-126   8901 30 03          jr nc, .wait0 ; no more delay
-127   8903
-128   8903 C3 F8 88       jp .wait ; wait some more
-129   8906              .wait0:
-130   8906 3A 78 5C       ld a, (23672) ; get the timer
-131   8909 32 32 88       ld (previousTimer), a ; store
-132   890C
-133   890C 3E 00          ld a, 0
-134   890E D3 FE          out (254),a
-135   8910
-136   8910 DD 21 33 88    ld ix, aliens
-137   8914 06 2A          ld b, numberOfAliens
-138   8916 0E 00          ld c,0
-139   8918              .nextAlien:
-140   8918 C5             push bc
-141   8919
-142   8919 CD 4B 89       call showAlien
-143   891C C1             pop bc
-144   891D
-145   891D 11 04 00       ld de, 4 ; size of the table entry
-146   8920 DD 19          add ix, de ; move onto next alien
-147   8922 10 F4          djnz .nextAlien
-148   8924
-149   8924              .display:
-150   8924 CD 49 83       call copyScreenAttributes
-151   8927 CD 2D 89       call undrawAliens
-152   892A C3 F8 88       jp gameLoop
-153   892D
-154   892D              ; undraws the alien and then moves it
-155   892D              undrawAliens:
-156   892D DD 21 33 88    ld ix, aliens
-157   8931 06 2A          ld b, numberOfAliens
-158   8933 0E 00          ld c,0
-159   8935              .loop:
-160   8935 C5             push bc
-161   8936 CD 53 89       call getAlienAddress
-162   8939 3E 38          ld a, WHITE_PAPER
-163   893B 77             ld (hl), a
-164   893C
-165   893C
-166   893C CD 63 89       call moveAlien
-167   893F CD 98 89       call checkBounds
-168   8942 C1             pop bc
-169   8943
-170   8943 11 04 00       ld de, 4 ; size of the table entry
-171   8946 DD 19          add ix, de ; next alien
-172   8948 10 EB          djnz .loop
-173   894A
-174   894A C9             ret
-175   894B
-176   894B              showAlien:
-177   894B CD 53 89      call getAlienAddress
-178   894E
-179   894E DD 7E 03       ld a, (ix+3)
-180   8951 77             ld (hl), a ; put it in the buffer
-181   8952
-182   8952 C9             ret
-183   8953
-184   8953              getAlienAddress:
-185   8953 DD 7E 00       ld a, (ix) ; get the status / direction
-186   8956 FE FF          cp 255 ; is it disabled?
-187   8958 C8             ret z ; yes, return
-188   8959
-189   8959 DD 46 01       ld b, (ix+1) ; get x coordinate
-190   895C DD 4E 02       ld c, (ix+2) ; get y coordinate
-191   895F
-192   895F CD 35 83       call CalculateAttributeBufferAddress
-193   8962 C9             ret
-194   8963
-195   8963              moveAlien:
-196   8963 DD 7E 00       ld a, (ix)
-197   8966 E6 01          and up
-198   8968 C4 84 89       call nz, moveAlienUp
-199   896B
-200   896B DD 7E 00       ld a, (ix)
-201   896E E6 02          and down
-202   8970 C4 89 89       call nz, moveAlienDown
-203   8973
-204   8973 DD 7E 00       ld a, (ix)
-205   8976 E6 04          and left
-206   8978 C4 8E 89       call nz, moveAlienLeft
-207   897B
-208   897B DD 7E 00       ld a, (ix)
-209   897E E6 08          and right
-210   8980 C4 93 89       call nz, moveAlienRight
-211   8983
-212   8983 C9             ret
-213   8984
-214   8984              moveAlienUp:
-215   8984 0D             dec c
-216   8985 DD 71 02       ld (ix+2), c
-217   8988 C9             ret
-218   8989              moveAlienDown:
-219   8989 0C             inc c
-220   898A DD 71 02       ld (ix+2), c
-221   898D C9             ret
-222   898E              moveAlienLeft:
-223   898E 05             dec b
-224   898F DD 70 01       ld (ix+1), b
-225   8992 C9             ret
-226   8993              moveAlienRight:
-227   8993 04             inc b
-228   8994 DD 70 01       ld (ix+1), b
-229   8997 C9             ret
-230   8998
-231   8998              checkBounds:
-232   8998                ; the position is stored in bc
-233   8998 DD 7E 00       ld a, (ix) ;  load the direction / status into D
-234   899B
-235   899B              .checkRight:
-236   899B                ; are we going right
-237   899B CB 5F          bit 3, a
-238   899D 28 0F          jr z, .checkLeft
-239   899F                ; if we are going right, check if we've hit the right boundary
-240   899F 78             ld a, b ; load the X position into A
-241   89A0 FE 1F          cp 31                    ; compare with the right boundary
-242   89A2 20 0A          jr nz, .checkLeft        ; if A < 31, we haven't hit the right boundary
-243   89A4 DD 7E 00       ld a, (ix)
-244   89A7 E6 F7          and 255 - right
-245   89A9 F6 04          or left
-246   89AB DD 77 00       ld (ix), a
-247   89AE
-248   89AE
-249   89AE              .checkLeft:
-250   89AE                ; are we going left
-251   89AE DD 7E 00       ld a, (ix) ;  load the direction / status into D
-252   89B1 CB 57          bit 2, a
-253   89B3 28 0F          jr z, .checkUp
-254   89B5                ; if we are going left, check if we've hit the left boundary
-255   89B5 78             ld a, b ; load the X position into A
-256   89B6 FE 00          cp 0
-257   89B8 20 0A          jr nz, .checkUp
-258   89BA DD 7E 00       ld a, (ix)
-259   89BD E6 FB          and 255 - left
-260   89BF F6 08          or right
-261   89C1 DD 77 00       ld (ix), a
-262   89C4
-263   89C4              .checkUp:
-264   89C4                ; are we going up
-265   89C4 DD 7E 00       ld a, (ix) ;  load the direction / status into D
-266   89C7 CB 47          bit 0, a
-267   89C9 28 12          jr z, .checkDown
-268   89CB                ; if we are going up, check if we've hit the top boundary
-269   89CB 79             ld a, c
-270   89CC FE 00          cp 0
-271   89CE 20 0D          jr nz, .checkDown
-272   89D0 DD 7E 00       ld a, (ix)
-273   89D3 E6 FE          and 255 - up
-274   89D5 F6 02          or down
-275   89D7 DD 77 00       ld (ix), a
-276   89DA C3 F3 89       jp .done
-277   89DD
-278   89DD              .checkDown:
-279   89DD                ; are we going down
-280   89DD DD 7E 00       ld a, (ix) ;  load the direction / status into D
-281   89E0 CB 4F          bit 1, a
-282   89E2 28 0F          jr z, .done
-283   89E4                ; if we are going down, check if we've hit the bottom boundary
-284   89E4 79             ld a, c
-285   89E5 FE 17          cp 23                    ; compare with the bottom boundary
-286   89E7 20 0A          jr nz, .done             ; if A < 23, we haven't hit the bottom boundary
-287   89E9 DD 7E 00       ld a, (ix)
-288   89EC E6 FD          and 255 - down
-289   89EE F6 01          or up
-290   89F0 DD 77 00       ld (ix), a
-291   89F3              .done:
-292   89F3 C9             ret
-293   89F4
-294   89F4
-295   89F4 FE 1F          cp 31                    ; compare with the right boundary
-296   89F6 30 3B          jr nc, hitRightBoundary  ; if A >= 31, we've hit the right boundary
-297   89F8 B7             or a                     ; check if A is 0 (the left boundary)
-298   89F9 28 25          jr z, hitLeftBoundary    ; if A == 0, we've hit the left boundary
-299   89FB              checkUpperLowerScreenBounds:
-300   89FB                                   ; move to Y position in memory
-301   89FB 79             ld a, c               ; load the Y position into A
-302   89FC FE 17          cp 23                    ; compare with the bottom boundary
-303   89FE 30 12          jr nc, hitBottomBoundary ; if A >= 23, we've hit the bottom boundary
-304   8A00 B7             or a                     ; check if A is 0 (the top boundary)
-305   8A01 28 01          jr z, hitTopBoundary     ; if A == 0, we've hit the top boundary
-306   8A03
-307   8A03 C9             ret
-308   8A04
-309   8A04              hitTopBoundary:
-310   8A04 DD 7E 00       ld a, (ix)
-311   8A07
-312   8A07 CB 47          bit 0, a            ; Check if the "down" bit is set in A.
-313   8A09 C8             ret z  ; If the "down" bit is not set, we don't need to change the direction.
-314   8A0A
-315   8A0A
-316   8A0A E6 FE          and 255 - up
-317   8A0C F6 02          or down
-318   8A0E DD 77 00       ld (ix), a
-319   8A11 C9             ret
-320   8A12
-321   8A12              ; This function is called when the alien hits the bottom boundary of the screen.
-322   8A12              ; It plays a sound effect, changes the direction of the alien to move up, and returns.
-323   8A12
-324   8A12              hitBottomBoundary:
-325   8A12 DD 7E 00       ld a, (ix)          ; Load the current direction of the alien into A.
-326   8A15
-327   8A15 CB 4F          bit 1, a            ; Check if the "down" bit is set in A.
-328   8A17 C8             ret z  ; If the "down" bit is not set, we don't need to change the direction.
-329   8A18
-330   8A18
-331   8A18 E6 FD          and 255 - down      ; Clear the "down" bit in A by ANDing it with the bitwise complement of "down".
-332   8A1A F6 01          or up               ; Set the "up" bit in A by ORing it with "up".
-333   8A1C DD 77 00       ld (ix), a          ; Store the new direction back into memory.
-334   8A1F C9             ret                 ; Return from the function.
-335   8A20
-336   8A20              hitLeftBoundary:
-337   8A20 DD 7E 00       ld a, (ix)
-338   8A23 CB 5F          bit 3,a
-339   8A25 CA FB 89       jp z, checkUpperLowerScreenBounds ; If the "left" bit is not set, we don't need to change the direction.
-340   8A28 E6 FB          and 255 - left
-341   8A2A F6 08          or right
-342   8A2C DD 77 00       ld (ix), a
-343   8A2F C3 FB 89       jp checkUpperLowerScreenBounds
-344   8A32 C9             ret
-345   8A33              hitRightBoundary:
-346   8A33 DD 7E 00       ld a, (ix)
-347   8A36
-348   8A36 CB 67          bit 4, a ; Check if the "right" bit is set in A.
-349   8A38 CA FB 89       jp z, checkUpperLowerScreenBounds ; If the "right" bit is not set, we don't need to change the direction.
-350   8A3B
-351   8A3B E6 F7          and 255 - right
-352   8A3D F6 04          or left
-353   8A3F DD 77 00       ld (ix), a
-354   8A42 C3 FB 89       jp checkUpperLowerScreenBounds
-355   8A45 C9             ret
-356   8A46
-357   8A46              im2_handler:
-358   8A46 F5             push af
-359   8A47 C5             push bc
-360   8A48 D5             push de
-361   8A49 E5             push hl
-362   8A4A 08             ex af,af'
-363   8A4B D9             exx
-364   8A4C F5             push af
-365   8A4D C5             push bc
-366   8A4E D5             push de
-367   8A4F E5             push hl
-368   8A50 DD E5          push ix
-369   8A52 FD E5          push iy
-370   8A54
-371   8A54
-372   8A54
-373   8A54                ;rst 56 ; read the keys and update clock
-374   8A54 2A 78 5C       ld hl, (23672)
-375   8A57 23             inc hl
-376   8A58 22 78 5C       ld (23672), hl
-377   8A5B 7C             ld a,h
-378   8A5C B5             or l
-379   8A5D
-380   8A5D                ; ^^ this is the same as rst 56
-381   8A5D
-382   8A5D FD E1          pop iy
-383   8A5F DD E1          pop ix
-384   8A61 E1             pop hl
-385   8A62 D1             pop de
-386   8A63 C1             pop bc
-387   8A64 F1             pop af
-388   8A65 08             ex af,af'
-389   8A66 D9             exx
-390   8A67 E1             pop hl
-391   8A68 D1             pop de
-392   8A69 C1             pop bc
-393   8A6A F1             pop af
-394   8A6B FB             ei
-395   8A6C C9             ret
-396   8A6D
-397   8A6D
-398   8A6D              ; Deployment
-399   8A6D                savesna "myapp.sna",start  ; Save the program as a snapshot file
+117   88F8              ; gameLoop - Main game loop
+118   88F8              gameLoop:
+119   88F8                ; Wait for 2 ticks
+120   88F8              .waitForTwoTicks:
+121   88F8                ; Load the previous timer value into HL
+122   88F8 21 32 88       ld hl, previousTimer
+123   88FB
+124   88FB                ; Get the current timer value and subtract the previous timer value
+125   88FB 3A 78 5C       ld a, (23672)
+126   88FE 96             sub (hl)
+127   88FF
+128   88FF                ; Check if we've waited for 2 ticks
+129   88FF              .checkIfTwoTicksWaited:
+130   88FF FE 02          cp 2
+131   8901 30 03          jr nc, .twoTicksWaited ; no more delay
+132   8903
+133   8903                ; If we haven't waited for 2 ticks yet, jump back to the start of the loop
+134   8903 C3 F8 88       jp .waitForTwoTicks
+135   8906
+136   8906              .twoTicksWaited:
+137   8906                ; If we've waited for 2 ticks, store the current timer value as the previous timer value
+138   8906 3A 78 5C       ld a, (23672)
+139   8909 32 32 88       ld (previousTimer), a
+140   890C
+141   890C                ; set the border colour to black
+142   890C 3E 00          ld a, 0
+143   890E D3 FE          out (254), a
+144   8910
+145   8910                ; Loop through the aliens table and show each alien
+146   8910 DD 21 33 88    ld ix, aliens
+147   8914 06 2A          ld b, numberOfAliens
+148   8916 0E 00          ld c, 0
+149   8918              .showAliensLoop:
+150   8918 C5             push bc
+151   8919
+152   8919 CD 4B 89       call showAlien
+153   891C
+154   891C C1             pop bc
+155   891D
+156   891D                ; Move onto the next alien in the table
+157   891D 11 04 00       ld de, 4 ; size of the table entry
+158   8920 DD 19          add ix, de
+159   8922 10 F4          djnz .showAliensLoop
+160   8924
+161   8924              .display:
+162   8924                ; Copy the attributes buffer to the screen attributes
+163   8924 CD 49 83       call copyScreenAttributes
+164   8927
+165   8927                ; Undraw the aliens (and move them)
+166   8927 CD 2D 89       call undrawAliens
+167   892A
+168   892A                ; Jump back to the start of the loop
+169   892A C3 F8 88       jp gameLoop
+170   892D
+171   892D
+172   892D              ; undrawAliens - Undraws the alien and then moves it
+173   892D              undrawAliens:
+174   892D DD 21 33 88    ld ix, aliens ; Load the address of the aliens table into IX
+175   8931 06 2A          ld b, numberOfAliens ; Load the number of aliens into B
+176   8933 0E 00          ld c, 0 ; Initialize the loop counter
+177   8935
+178   8935              .loop:
+179   8935 C5             push bc ; Save the loop counter on the stack
+180   8936
+181   8936                ; Get the address of the current alien
+182   8936 CD 53 89       call getAlienAddress
+183   8939
+184   8939                ; Set the paper color to black to 'undraw' the alien
+185   8939 3E 00          ld a, BLACK_PAPER
+186   893B 77             ld (hl), a
+187   893C
+188   893C                ; Move the alien
+189   893C CD 63 89       call moveAlien
+190   893F
+191   893F                ; Check if the alien is within the screen bounds
+192   893F CD 98 89       call checkBounds
+193   8942
+194   8942 C1             pop bc ; Restore the loop counter from the stack
+195   8943
+196   8943                ; Move onto the next alien in the table
+197   8943 11 04 00       ld de, 4 ; size of the table entry
+198   8946 DD 19          add ix, de
+199   8948 10 EB          djnz .loop ; Decrement B and jump back to the start of the loop if B is not zero
+200   894A
+201   894A                ; Return from the subroutine
+202   894A C9             ret
+203   894B
+204   894B              ; showAlien - Displays the alien on the screen
+205   894B              showAlien:
+206   894B                ; Get the address of the current alien
+207   894B CD 53 89       call getAlienAddress
+208   894E
+209   894E                ; Get the color of the alien from the table and put it in the buffer
+210   894E DD 7E 03       ld a, (ix+3)
+211   8951 77             ld (hl), a
+212   8952
+213   8952                ; Return from the subroutine
+214   8952 C9             ret
+215   8953
+216   8953              ; getAlienAddress - Gets the address of the current alien in the attribute buffer
+217   8953              getAlienAddress:
+218   8953                ; Check if the alien is disabled
+219   8953 DD 7E 00       ld a, (ix) ; Load the status/direction byte into A
+220   8956 FE FF          cp 255 ; Check if it's equal to 255 (disabled)
+221   8958 C8             ret z ; If it's disabled, return
+222   8959
+223   8959                ; Get the x and y coordinates of the alien
+224   8959 DD 46 01       ld b, (ix+1) ; Load the x coordinate into B
+225   895C DD 4E 02       ld c, (ix+2) ; Load the y coordinate into C
+226   895F
+227   895F                ; Calculate the address of the alien in the attribute buffer
+228   895F CD 35 83       call CalculateAttributeBufferAddress
+229   8962
+230   8962                ; Return from the subroutine with the address in HL
+231   8962 C9             ret
+232   8963
+233   8963              ; moveAlien - Moves the alien in the direction specified by its status byte
+234   8963              moveAlien:
+235   8963                ; Check if the alien is moving up
+236   8963 DD 7E 00       ld a, (ix)
+237   8966 E6 01          and up
+238   8968 C4 84 89       call nz, moveAlienUp
+239   896B
+240   896B                ; Check if the alien is moving down
+241   896B DD 7E 00       ld a, (ix)
+242   896E E6 02          and down
+243   8970 C4 89 89       call nz, moveAlienDown
+244   8973
+245   8973                ; Check if the alien is moving left
+246   8973 DD 7E 00       ld a, (ix)
+247   8976 E6 04          and left
+248   8978 C4 8E 89       call nz, moveAlienLeft
+249   897B
+250   897B                ; Check if the alien is moving right
+251   897B DD 7E 00       ld a, (ix)
+252   897E E6 08          and right
+253   8980 C4 93 89       call nz, moveAlienRight
+254   8983
+255   8983 C9             ret
+256   8984
+257   8984              ; moveAlienUp - Moves the alien up by decrementing its y coordinate
+258   8984              moveAlienUp:
+259   8984 0D             dec c ; Decrement the y coordinate
+260   8985 DD 71 02       ld (ix+2), c ; Store the new y coordinate in the aliens table
+261   8988 C9             ret
+262   8989
+263   8989              ; moveAlienDown - Moves the alien down by incrementing its y coordinate
+264   8989              moveAlienDown:
+265   8989 0C             inc c ; Increment the y coordinate
+266   898A DD 71 02       ld (ix+2), c ; Store the new y coordinate in the aliens table
+267   898D C9             ret
+268   898E
+269   898E              ; moveAlienLeft - Moves the alien left by decrementing its x coordinate
+270   898E              moveAlienLeft:
+271   898E 05             dec b ; Decrement the x coordinate
+272   898F DD 70 01       ld (ix+1), b ; Store the new x coordinate in the aliens table
+273   8992 C9             ret
+274   8993
+275   8993              ; moveAlienRight - Moves the alien right by incrementing its x coordinate
+276   8993              moveAlienRight:
+277   8993 04             inc b ; Increment the x coordinate
+278   8994 DD 70 01       ld (ix+1), b ; Store the new x coordinate in the aliens table
+279   8997 C9             ret
+280   8998
+281   8998              checkBounds:
+282   8998                ; the position is stored in bc
+283   8998 DD 7E 00       ld a, (ix) ;  load the direction / status into D
+284   899B
+285   899B              .checkRight:
+286   899B                ; are we going right
+287   899B CB 5F          bit 3, a
+288   899D 28 0F          jr z, .checkLeft
+289   899F                ; if we are going right, check if we've hit the right boundary
+290   899F 78             ld a, b ; load the X position into A
+291   89A0 FE 1F          cp 31                    ; compare with the right boundary
+292   89A2 20 0A          jr nz, .checkLeft        ; if A < 31, we haven't hit the right boundary
+293   89A4 DD 7E 00       ld a, (ix)
+294   89A7 E6 F7          and 255 - right
+295   89A9 F6 04          or left
+296   89AB DD 77 00       ld (ix), a
+297   89AE
+298   89AE
+299   89AE              .checkLeft:
+300   89AE                ; are we going left
+301   89AE DD 7E 00       ld a, (ix) ;  load the direction / status into D
+302   89B1 CB 57          bit 2, a
+303   89B3 28 0F          jr z, .checkUp
+304   89B5                ; if we are going left, check if we've hit the left boundary
+305   89B5 78             ld a, b ; load the X position into A
+306   89B6 FE 00          cp 0
+307   89B8 20 0A          jr nz, .checkUp
+308   89BA DD 7E 00       ld a, (ix)
+309   89BD E6 FB          and 255 - left
+310   89BF F6 08          or right
+311   89C1 DD 77 00       ld (ix), a
+312   89C4
+313   89C4              .checkUp:
+314   89C4                ; are we going up
+315   89C4 DD 7E 00       ld a, (ix) ;  load the direction / status into D
+316   89C7 CB 47          bit 0, a
+317   89C9 28 12          jr z, .checkDown
+318   89CB                ; if we are going up, check if we've hit the top boundary
+319   89CB 79             ld a, c
+320   89CC FE 00          cp 0
+321   89CE 20 0D          jr nz, .checkDown
+322   89D0 DD 7E 00       ld a, (ix)
+323   89D3 E6 FE          and 255 - up
+324   89D5 F6 02          or down
+325   89D7 DD 77 00       ld (ix), a
+326   89DA C3 F3 89       jp .done
+327   89DD
+328   89DD              .checkDown:
+329   89DD                ; are we going down
+330   89DD DD 7E 00       ld a, (ix) ;  load the direction / status into D
+331   89E0 CB 4F          bit 1, a
+332   89E2 28 0F          jr z, .done
+333   89E4                ; if we are going down, check if we've hit the bottom boundary
+334   89E4 79             ld a, c
+335   89E5 FE 17          cp 23                    ; compare with the bottom boundary
+336   89E7 20 0A          jr nz, .done             ; if A < 23, we haven't hit the bottom boundary
+337   89E9 DD 7E 00       ld a, (ix)
+338   89EC E6 FD          and 255 - down
+339   89EE F6 01          or up
+340   89F0 DD 77 00       ld (ix), a
+341   89F3              .done:
+342   89F3 C9             ret
+343   89F4
+344   89F4
+345   89F4
+346   89F4              im2_handler:
+347   89F4 F5             push af
+348   89F5 C5             push bc
+349   89F6 D5             push de
+350   89F7 E5             push hl
+351   89F8 08             ex af,af'
+352   89F9 D9             exx
+353   89FA F5             push af
+354   89FB C5             push bc
+355   89FC D5             push de
+356   89FD E5             push hl
+357   89FE DD E5          push ix
+358   8A00 FD E5          push iy
+359   8A02
+360   8A02
+361   8A02
+362   8A02                ;rst 56 ; read the keys and update clock
+363   8A02 2A 78 5C       ld hl, (23672)
+364   8A05 23             inc hl
+365   8A06 22 78 5C       ld (23672), hl
+366   8A09 7C             ld a,h
+367   8A0A B5             or l
+368   8A0B
+369   8A0B                ; ^^ this is the same as rst 56
+370   8A0B
+371   8A0B FD E1          pop iy
+372   8A0D DD E1          pop ix
+373   8A0F E1             pop hl
+374   8A10 D1             pop de
+375   8A11 C1             pop bc
+376   8A12 F1             pop af
+377   8A13 08             ex af,af'
+378   8A14 D9             exx
+379   8A15 E1             pop hl
+380   8A16 D1             pop de
+381   8A17 C1             pop bc
+382   8A18 F1             pop af
+383   8A19 FB             ei
+384   8A1A C9             ret
+385   8A1B
+386   8A1B
+387   8A1B              ; Deployment
+388   8A1B                savesna "myapp.sna",start  ; Save the program as a snapshot file
 # file closed: /Users/darren/dev/spectrum/zx/project/src/myapp.asm

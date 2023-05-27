@@ -67,7 +67,7 @@ CopyOfStackPointer: defw 0
 
 ; here's our buffer - let's initialise it to all white paper, black ink
 AttributeBuffer:
-    block 768, STABLE + DULL + WHITE_PAPER + BLACK_INK
+    block 768, STABLE + DULL + BLACK_PAPER + WHITE_INK
 
 ; here's our lookup table
 AttributeBufferLookup:
