@@ -18,6 +18,7 @@ IM2_VECTOR  = $FDFD ; IM2 interrupt vector in decimal is 65021
 
   include "library/doubleBufferAttributes.asm"
   include "library/colours.asm"
+  include "music.asm"
 
 ; store the previous timer value
 previousTimer: defb 0
@@ -127,9 +128,10 @@ gameLoop:
 
   ; Check if we've waited for 2 ticks
 .checkIfTwoTicksWaited:
-  cp 2
+  cp 4
   jr nc, .twoTicksWaited ; no more delay
 
+  
   ; If we haven't waited for 2 ticks yet, jump back to the start of the loop
   jp .waitForTwoTicks
 
@@ -141,6 +143,8 @@ gameLoop:
   ; set the border colour to black
   ld a, 0
   out (254), a
+
+    call loadNote
 
   ; Loop through the aliens table and show each alien
   ld ix, aliens
@@ -342,6 +346,67 @@ checkBounds:
   ret
 
 
+  cp 31                    ; compare with the right boundary
+  jr nc, hitRightBoundary  ; if A >= 31, we've hit the right boundary
+  or a                     ; check if A is 0 (the left boundary)
+  jr z, hitLeftBoundary    ; if A == 0, we've hit the left boundary
+checkUpperLowerScreenBounds:
+                     ; move to Y position in memory
+  ld a, c               ; load the Y position into A
+  cp 23                    ; compare with the bottom boundary
+  jr nc, hitBottomBoundary ; if A >= 23, we've hit the bottom boundary
+  or a                     ; check if A is 0 (the top boundary)
+  jr z, hitTopBoundary     ; if A == 0, we've hit the top boundary
+
+  ret
+
+hitTopBoundary:  
+  ld a, (ix)
+
+  bit 0, a            ; Check if the "down" bit is set in A.
+  ret z  ; If the "down" bit is not set, we don't need to change the direction.
+
+
+  and 255 - up
+  or down
+  ld (ix), a
+  ret
+
+; This function is called when the alien hits the bottom boundary of the screen.
+; It plays a sound effect, changes the direction of the alien to move up, and returns.
+
+hitBottomBoundary:
+  ld a, (ix)          ; Load the current direction of the alien into A.
+  
+  bit 1, a            ; Check if the "down" bit is set in A.
+  ret z  ; If the "down" bit is not set, we don't need to change the direction.
+
+
+  and 255 - down      ; Clear the "down" bit in A by ANDing it with the bitwise complement of "down".
+  or up               ; Set the "up" bit in A by ORing it with "up".
+  ld (ix), a          ; Store the new direction back into memory.
+  ret                 ; Return from the function.
+
+hitLeftBoundary:
+  ld a, (ix)
+  bit 3,a
+  jp z, checkUpperLowerScreenBounds ; If the "left" bit is not set, we don't need to change the direction.
+  and 255 - left
+  or right
+  ld (ix), a
+  jp checkUpperLowerScreenBounds
+  ret
+hitRightBoundary:
+  ld a, (ix)
+
+  bit 4, a ; Check if the "right" bit is set in A.
+  jp z, checkUpperLowerScreenBounds ; If the "right" bit is not set, we don't need to change the direction.
+
+  and 255 - right
+  or left
+  ld (ix), a
+  jp checkUpperLowerScreenBounds
+  ret
 
 im2_handler:
   push af
@@ -357,7 +422,8 @@ im2_handler:
   push ix
   push iy
 
-
+  ; play music here
+  ; call loadNote
 
   ;rst 56 ; read the keys and update clock
   ld hl, (23672)
