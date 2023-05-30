@@ -78,6 +78,7 @@ aliens:
 numberOfAliens: equ ($ - aliens) / 4
 
 start:
+  jp myStart
   ; This section of code sets up the IM2 interrupt vector table and enables interrupts.
 
   ; Disable interrupts
@@ -128,10 +129,11 @@ gameLoop:
 
   ; Check if we've waited for 2 ticks
 .checkIfTwoTicksWaited:
-  cp 4
+  cp 3
   jr nc, .twoTicksWaited ; no more delay
 
-  
+      ; call loadNote
+
   ; If we haven't waited for 2 ticks yet, jump back to the start of the loop
   jp .waitForTwoTicks
 
@@ -140,13 +142,17 @@ gameLoop:
   ld a, (23672)
   ld (previousTimer), a
 
+
+
   ; set the border colour to black
   ld a, 0
   out (254), a
 
-    call loadNote
 
+myStart:
   ; Loop through the aliens table and show each alien
+
+  call loadNote
   ld ix, aliens
   ld b, numberOfAliens
   ld c, 0
@@ -170,7 +176,8 @@ gameLoop:
   call undrawAliens
 
   ; Jump back to the start of the loop
-  jp gameLoop
+  ;jp gameLoop
+  jp myStart
 
 
 ; undrawAliens - Undraws the alien and then moves it

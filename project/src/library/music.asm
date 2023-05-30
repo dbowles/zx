@@ -51,7 +51,7 @@ loadNote:
   ld a,0 ; border colour
 
   ld e, d ; initialise the pitch delay counter
-  ld bc, 3 ; initialise the duration delay counters in b (0) and c(3)
+  ld bc, 14 ; initialise the duration delay counters in b (0) and c(3)
 .noise:
   out (254), a ; make a noise
   dec e
@@ -107,96 +107,96 @@ C6 EQU 255
 ; Melody data
 
 tune:
-  db 128, 102, 86, 86, 171, 43
-  db 43
-  db 171
-  db 51
-  db 51
-  db 171
-  db 128
-  db 128
-  db 102
-  db 86
-  db 96
-  db 171
-  db 43
-  db 43
-  db 171
-  db 48
-  db 48
-  db 171
-  db 136
-  db 136
-  db 114
-  db 76
-  db 76
-  db 171
-  db 38
-  db 38
-  db 171
-  db 48
-  db 48
-  db 171
-  db 136
-  db 136
-  db 114
-  db 76
-  db 76
-  db 171
-  db 38
-  db 38
-  db 171
-  db 51
-  db 51
-  db 171
-  db 128
-  db 128
-  db 102
-  db 86
-  db 64
-  db 128
-  db 32
-  db 32
-  db 128
-  db 43
-  db 43
-  db 128
-  db 128
-  db 128
-  db 102
-  db 86
-  db 64
-  db 128
-  db 32
-  db 32
-  db 128
-  db 38
-  db 38
-  db 0
-  db 114
-  db 114
-  db 96
-  db 76
-  db 76
-  db 76
-  db 76
-  db 76
-  db 91
-  db 86
-  db 51
-  db 51
-  db 51
-  db 51
-  db 64
-  db 102
-  db 102
-  db 114
-  db 76
-  db 86
-  db 128
-  db 128
-  db 128
-  db 128
+  ; db 128, 102, 86, 86, 171, 43
+  ; db 43
+  ; db 171
+  ; db 51
+  ; db 51
+  ; db 171
+  ; db 128
+  ; db 128
+  ; db 102
+  ; db 86
+  ; db 96
+  ; db 171
+  ; db 43
+  ; db 43
+  ; db 171
+  ; db 48
+  ; db 48
+  ; db 171
+  ; db 136
+  ; db 136
+  ; db 114
+  ; db 76
+  ; db 76
+  ; db 171
+  ; db 38
+  ; db 38
+  ; db 171
+  ; db 48
+  ; db 48
+  ; db 171
+  ; db 136
+  ; db 136
+  ; db 114
+  ; db 76
+  ; db 76
+  ; db 171
+  ; db 38
+  ; db 38
+  ; db 171
+  ; db 51
+  ; db 51
+  ; db 171
+  ; db 128
+  ; db 128
+  ; db 102
+  ; db 86
+  ; db 64
+  ; db 128
+  ; db 32
+  ; db 32
+  ; db 128
+  ; db 43
+  ; db 43
+  ; db 128
+  ; db 128
+  ; db 128
+  ; db 102
+  ; db 86
+  ; db 64
+  ; db 128
+  ; db 32
+  ; db 32
+  ; db 128
+  ; db 38
+  ; db 38
+  ; db 0
+  ; db 114
+  ; db 114
+  ; db 96
+  ; db 76
+  ; db 76
+  ; db 76
+  ; db 76
+  ; db 76
+  ; db 91
+  ; db 86
+  ; db 51
+  ; db 51
+  ; db 51
+  ; db 51
+  ; db 64
+  ; db 102
+  ; db 102
+  ; db 114
+  ; db 76
+  ; db 86
+  ; db 128
+  ; db 128
+  ; db 128
+  ; db 128
 
   ; in the hall of the mountain king
   ; db C5,ASharp4,GSharp4,G4,F4,GSharp4,F4,F4,E4,G4,E4,E4,F4,GSharp4,F4,F4        
@@ -205,7 +205,7 @@ tune:
   ; db C5,ASharp4,GSharp4,G4,F4,GSharp4,F4,C4,F4,GSharp4,C5,GSharp4,F4,F4,F4,F4  
 
   ; if I were a rich man
-  ; db F4,G4,F4,G4,GSharp4,GSharp4,C5,C5,C5,C5,GSharp4,G4,F4,G4,F4,G4     
-  ; db GSharp4,G4,F4,DSharp4,D4,DSharp4,D4,DSharp4,F4,F4,F4,F4,F4,F4,F4,F4        
-  ; db C4,C4,C4,C4,CSharp4,CSharp4,DSharp4,DSharp4,F4,G4,GSharp4,G4,F4,F4,GSharp4,GSharp4 
-  ; db E4,F4,G4,F4,E4,E4,G4,G4,C4,C4,C4,C4,C4,C4,C4,C4   
+  db F4,G4,F4,G4,GSharp4,GSharp4,C5,C5,C5,C5,GSharp4,G4,F4,G4,F4,G4     
+  db GSharp4,G4,F4,DSharp4,D4,DSharp4,D4,DSharp4,F4,F4,F4,F4,F4,F4,F4,F4        
+  db C4,C4,C4,C4,CSharp4,CSharp4,DSharp4,DSharp4,F4,G4,GSharp4,G4,F4,F4,GSharp4,GSharp4 
+  db E4,F4,G4,F4,E4,E4,G4,G4,C4,C4,C4,C4,C4,C4,C4,C4   
